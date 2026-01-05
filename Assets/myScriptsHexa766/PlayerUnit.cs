@@ -16,27 +16,49 @@ public class PlayerUnit : MonoBehaviour
     void Start()
     {
         map = FindObjectOfType<Map1HexGrid>();
-        if (!map) Debug.LogError($"[{name}] Map1HexGrid missing!");
-        else
+        if (!map)
         {
-            string tileName = map.TileAt(transform.position);
-            if (tileName == "OriginRed") currentTileCoord = new Vector2Int(0, 0);
-            else if (tileName == "OriginBlue") currentTileCoord = new Vector2Int(5, 5);
-            Debug.Log($"[{name}] start @ {currentTileCoord} v{currentVertexIndex}");
+            Debug.LogError($"[{name}] Map1HexGrid missing!");
+            return;
         }
+
+        // Use the real grid coord from world position
+        currentTileCoord = map.WorldToGridCoord(transform.position);
+
+        // Vertex will be set on first move — default to 0
+        currentVertexIndex = 0;
+
+        Debug.Log($"[{name}] start @ {currentTileCoord} v{currentVertexIndex}");
+    }
+
+    public bool IsValidMove(Vector2Int tile, int v)
+    {
+        if (currentTileCoord == tile && currentVertexIndex == v) return false;
+
+        int dq = tile.x - currentTileCoord.x;
+        int dr = tile.y - currentTileCoord.y;
+        if (Mathf.Abs(dq) > 1 || Mathf.Abs(dr) > 1 || Mathf.Abs(dq + dr) > 1) return false;  // ← THIS LINE IS KILLING YOU
+
+        // ... rest
+        return movementPoints > 0;
+    }
+
+    public void ResetTurn()
+    {
+        movementPoints = 1;
     }
 
     public bool MoveToTile(Vector2Int tileCoord, int vertexIdx)
     {
         Debug.Log($"[MOVE] MoveToTile called — from {currentTileCoord} v{currentVertexIndex} to {tileCoord} v{vertexIdx}");
 
-        // REVERSE LOOKUP: grid coord → tile name → tile object → vertex position
+        // REVERSE LOOKUP: grid coord → tile name → vertex position
         string tileName = map.tileNameToGrid.FirstOrDefault(kvp => kvp.Value == tileCoord).Key;
 
         Vector3 pos;
         if (!string.IsNullOrEmpty(tileName))
         {
-            pos = map.GetVertexPosition(tileName, vertexIdx);   // ← use tile name (string) version
+            pos = map.GetVertexPosition(tileName, vertexIdx);   // exact position from map
         }
         else
         {
@@ -61,24 +83,6 @@ public class PlayerUnit : MonoBehaviour
         movementPoints--;
         return true;
     }
-
-    public bool IsValidMove(Vector2Int tile, int v)
-    {
-        if (currentTileCoord == tile && currentVertexIndex == v) return false;
-
-        int dq = tile.x - currentTileCoord.x;
-        int dr = tile.y - currentTileCoord.y;
-        if (Mathf.Abs(dq) > 1 || Mathf.Abs(dr) > 1 || Mathf.Abs(dq + dr) > 1) return false;  // ← THIS LINE IS KILLING YOU
-
-        // ... rest
-        return movementPoints > 0;
-    }
-
-    public void ResetTurn()
-    {
-        movementPoints = 1;
-    }
-
     IEnumerator SmoothMove(Vector3 target)
     {
         Vector3 start = transform.position;
@@ -92,6 +96,7 @@ public class PlayerUnit : MonoBehaviour
         transform.position = target;
     }
 
+    
     // ==============================================================
     // HELPER: Convert Vector2Int → World Position → Tile GameObject
     // ==============================================================

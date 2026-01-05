@@ -77,14 +77,14 @@ public class TurnManager : MonoBehaviour
 
         if (current == null || map == null) return;
 
-        // ONLY ONE SOURCE OF TRUTH — from Map inspector's Default Move Points
         int range = map.defaultMovePoints;
 
-        List<Vector3> reachablePositions = map.GetReachableVerticesFromPlayer(current.gameObject, range);
+        var reachable = map.GetReachableVerticesFromPlayerAsPairs(current.gameObject, range);
 
-
-        foreach (Vector3 pos in reachablePositions)
+        foreach (var (tileName, vertexIdx) in reachable)
         {
+            Vector3 pos = map.GetVertexPosition(tileName, vertexIdx);
+
             GameObject s = Instantiate(map.vertexMarkerPrefab, pos + Vector3.up * 0.05f, Quaternion.identity);
             s.transform.localScale = Vector3.one * sphereSize;
 
@@ -102,16 +102,8 @@ public class TurnManager : MonoBehaviour
             var click = s.GetComponent<ClickableSphere>();
             if (click != null)
             {
-                string tileName = map.TileAt(pos);
-                int vertex = 0; // default
-
-                if (!string.IsNullOrEmpty(tileName) && map.tileGameObjectMap.TryGetValue(tileName, out GameObject tileObj))
-                {
-                    vertex = GetClosestVertex(tileObj.transform.position, pos);
-                }
-
-                click.targetTile = map.WorldToGridCoord(pos);
-                click.targetVertex = vertex;
+                click.targetTile = map.GetTileGridCoord(tileName);
+                click.targetVertex = vertexIdx;
                 click.turnManager = this;
             }
 

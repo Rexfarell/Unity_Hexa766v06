@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEditor.Callbacks;
-[DefaultExecutionOrder(-100)]  // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+[DefaultExecutionOrder(-100)]  // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 public class Map1HexGrid : MonoBehaviour
 
 {
@@ -1535,19 +1535,74 @@ public class Map1HexGrid : MonoBehaviour
         Debug.Log("[MARKERS] ALL spheres destroyed!");
     }
     [ContextMenu("TEST — Show Player1 reach directly")]
+    [ContextMenu("TEST — Show Player1 reach directly")]
     public void TestDirectReach()
     {
-        if (Player1 == null) { Debug.LogError("Player1 missing"); return; }
+        if (Player1 == null) return;
 
-        var list = GetReachableVerticesFromPlayer(Player1, 5);
-        Debug.Log($"TEST: Found {list.Count} reachable vertices");
+        var (currentTileName, currentVertexIndex) = GetPlayerTileAndVertex(Player1);
+        if (currentTileName == null) return;
 
-        foreach (var pos in list)
+        // Get reachable as (tileName, vertexIndex) — change the method to return this (see below)
+        var reachable = GetReachableVerticesFromPlayerAsPairs(Player1, 5);
+
+        Debug.Log($"TEST: Found {reachable.Count} reachable vertices");
+
+        foreach (var (tileName, vertexIdx) in reachable)
         {
+            Vector3 pos = GetVertexPosition(tileName, vertexIdx);   // ← EXACT, SAME AS CUSTOM PLACEMENT
             var s = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             s.transform.position = pos + Vector3.up * 0.2f;
             s.transform.localScale = Vector3.one * 0.4f;
+            s.transform.SetParent(transform);   // so ClearAllChildren destroys them
         }
+    }
+
+    public List<(string tileName, int vertexIndex)> GetReachableVerticesFromPlayerAsPairs(GameObject player, int maxSteps)
+    {
+        var (tileName, vertexIndex) = GetPlayerTileAndVertex(player);
+        if (tileName == null || vertexIndex == -1) return new List<(string, int)>();
+
+        Vector3 start = GetVertexPosition(tileName, vertexIndex);
+        if (!vertexGraph.ContainsKey(start)) return new List<(string, int)>();
+
+        var reachable = new List<(string tileName, int vertexIndex)>();
+        var queue = new Queue<(Vector3 pos, int steps)>();
+        var visited = new HashSet<Vector3>();
+
+        queue.Enqueue((start, 0));
+        visited.Add(start);
+
+        while (queue.Count > 0)
+        {
+            var (pos, steps) = queue.Dequeue();
+
+            if (steps > 0)
+            {
+                Vector3 roundedPos = RoundToGrid(pos);
+                if (vertexToTile.TryGetValue(roundedPos, out var data))
+                {
+                    reachable.Add((data.tileName, data.vertexIndex));
+                }
+                else
+                {
+                    Debug.LogWarning("[REACH] No vertex data for pos " + pos);
+                }
+            }
+
+            if (steps >= maxSteps) continue;
+
+            foreach (var neighbor in vertexGraph[pos])
+            {
+                if (!visited.Contains(neighbor))
+                {
+                    visited.Add(neighbor);
+                    queue.Enqueue((neighbor, steps + 1));
+                }
+            }
+        }
+
+        return reachable;
     }
 }
 
