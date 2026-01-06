@@ -51,24 +51,37 @@ public class PlayerUnit : MonoBehaviour
     public bool MoveToTile(Vector2Int tileCoord, int vertexIdx)
     {
         Debug.Log($"[MOVE] MoveToTile called — from {currentTileCoord} v{currentVertexIndex} to {tileCoord} v{vertexIdx}");
+        Debug.Log("[SOUND] Trying to play cyberBurstSound — is null? " + (map.cyberBurstSound == null));
+
+        if (map == null)
+        {
+            Debug.LogError("[MOVE] Map reference missing!");
+            return false;
+        }
 
         // REVERSE LOOKUP: grid coord → tile name → vertex position
         string tileName = map.tileNameToGrid.FirstOrDefault(kvp => kvp.Value == tileCoord).Key;
 
+        // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+        // MOVE THIS LINE UP — DECLARE pos HERE
         Vector3 pos;
         if (!string.IsNullOrEmpty(tileName))
         {
-            pos = map.GetVertexPosition(tileName, vertexIdx);   // exact position from map
+            pos = map.GetVertexPosition(tileName, vertexIdx);
         }
         else
         {
             Debug.LogWarning($"[{name}] No tile name for coord {tileCoord} — fallback to current position");
             pos = transform.position;
         }
+        // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 
         StartCoroutine(SmoothMove(pos));
         currentTileCoord = tileCoord;
         currentVertexIndex = vertexIdx;
+
+        // PLAY SOUND — NOW pos IS IN SCOPE
+        map.PlayBurstSound(pos);
 
         int dmg = Random.Range(20, 81);
         energy = Mathf.Max(0, energy - dmg);

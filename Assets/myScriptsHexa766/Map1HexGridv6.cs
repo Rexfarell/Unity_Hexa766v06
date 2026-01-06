@@ -385,14 +385,18 @@ public class Map1HexGrid : MonoBehaviour
         aPlayerToVertex(Player2, p2TileName, player2VertexIndex);
     }
     [Header("SOUND")]
-    [SerializeField] private AudioClip cyberBurstSound;
+    [SerializeField] public AudioClip cyberBurstSound;
 
-    private void PlayBurstSound()
+    public void PlayBurstSound(Vector3 position)
     {
         if (cyberBurstSound != null)
-            AudioSource.PlayClipAtPoint(cyberBurstSound, Camera.main.transform.position, 0.7f);
+        {
+            AudioSource.PlayClipAtPoint(cyberBurstSound, position, 0.7f);
+        }
         else
-            Debug.Log("[SOUND] CyberBurst clip missing!");
+        {
+            Debug.LogWarning("[SOUND] CyberBurst clip missing!");
+        }
     }
     [ContextMenu("Force Clean Dropdowns")]
     void ForceResetDropdowns()
@@ -1492,7 +1496,7 @@ public class Map1HexGrid : MonoBehaviour
         }
 
         rend.sharedMaterial.SetColor("_EmissionColor", Color.white * 10f);
-        PlayBurstSound();
+        PlayBurstSound(marker.transform.position);   // or player.transform.position
 
         GameObject flash = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         flash.transform.position = marker.transform.position;
@@ -1534,7 +1538,7 @@ public class Map1HexGrid : MonoBehaviour
 
         Debug.Log("[MARKERS] ALL spheres destroyed!");
     }
-    [ContextMenu("TEST — Show Player1 reach directly")]
+
     [ContextMenu("TEST — Show Player1 reach directly")]
     public void TestDirectReach()
     {
