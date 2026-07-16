@@ -1,184 +1,321 @@
-﻿// TurnManager.cs — FULL, FINAL, CLEAN, 260+ LINES, DEFAULT MOVE POINTS FIXED, NO GARBAGE
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
 public class TurnManager : MonoBehaviour
+
 {
+    // ---------------- SINGLETON ----------------
+    public static TurnManager Instance { get; private set; }
+
+    void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    // ---------------- CONFIG ----------------
     [Header("Visuals")]
-    public Material sphereMaterial;            // ← Assign a nice material in Inspector
+    public Material sphereMaterial;
     public float sphereSize = 0.32f;
 
+    // ---------------- STATE ----------------
     private Map1HexGrid map;
     public List<PlayerUnit> players = new List<PlayerUnit>();
+    
+    
     private int currentIndex = -1;
-    public PlayerUnit current { get; set; }
+    public PlayerUnit current { get; private set; }
 
     private List<GameObject> highlights = new List<GameObject>();
     private bool isProcessingMove = false;
 
+    // ---------------- INIT ----------------
     void Start()
     {
-        map = FindObjectOfType<Map1HexGrid>();
+        Debug.Log("[TURN] TurnManager Start");
+        StartCoroutine(WaitForMapThenStartTurns());
+    }
 
-        // FIND PLAYERUNITS EVEN IF INACTIVE OR CHILDREN
-        PlayerUnit[] found = Resources.FindObjectsOfTypeAll<PlayerUnit>();
-        players.AddRange(found.Where(p => p.gameObject.scene.IsValid()));
 
-        Debug.Log($"[TurnManager] Found {players.Count} PlayerUnits (even inactive)");
+    IEnumerator DelayedStart()
+    {
+        yield return null; // wait ONE frame for PlayerUnit.Awake()
 
         if (players.Count == 0)
         {
-            Debug.LogError("NO PLAYERUNIT FOUND — ARE THEY ATTACHED?");
-            return;
+            Debug.LogError("[TURN] No players registered after delay");
+            yield break;
         }
 
-        StartCoroutine(WaitForMapAndStart());
-    }
-
-    private IEnumerator WaitForMapAndStart()
-    {
-        while (map == null || !map.hasGenerated || map.vertexToTile.Count == 0)
-        {
-            yield return null;
-        }
-
-        Debug.Log($"[TurnManager] Map ready — {map.vertexToTile.Count} vertices loaded. Starting game...");
+        Debug.Log($"[TURN] {players.Count} players registered. Starting turns.");
         StartNextTurn();
     }
 
+
+    // ---------------- TURN FLOW ----------------
     void StartNextTurn()
     {
-        ClearHighlights();
+        Debug.Log("=== START NEXT TURN CALLED ===");
 
-        if (players.Count == 0) { Debug.Log("Game Over"); return; }
-
-        int safety = 0;
-        do
+        if (players == null || players.Count == 0)
         {
-            currentIndex = (currentIndex + 1) % players.Count;
-            current = players[currentIndex];
-        } while (++safety < players.Count && (current == null || !current.gameObject.activeSelf));
+            Debug.LogWarning("[TURN] No players registered");
+            return;
+        }
 
-        if (current == null || !current.gameObject.activeSelf)
-        { Debug.Log("All players dead"); return; }
+        ClearHighlights();
+        isProcessingMove = false;
 
-        current.ResetTurn();
-        Camera.main?.GetComponent<CameraFollow>()?.SetTarget(current.transform);
+        currentIndex = (currentIndex + 1) % players.Count;
+        current = players[currentIndex];
+
+        if (current == null)
+        {
+            Debug.LogError("[TURN] Current player is NULL");
+            return;
+        }
+
+        current.ResetTurn(); // ✅ THIS EXISTS
+
+        CameraFollow cam = FindObjectOfType<CameraFollow>();
+        if (cam != null)
+        {
+            cam.SetTarget(current.transform);
+        }
+
+        Debug.Log($"[TURN] Current player: {current.name}");
+
         HighlightValidMoves();
-
-        Debug.Log($"→ {current.name}'s turn");
     }
 
-    public void HighlightValidMoves()
+
+
+
+
+    public void TryEndTurn()
     {
+        if (isProcessingMove || current == null)
+            return;
+
+        Debug.Log($"[TURN END] {current.name}");
+        StartNextTurn();
+    }
+
+    // ---------------- MOVEMENT ----------------
+    public void OnSphereClicked(Vector2Int tile, int vertex)
+    {
+        Debug.Log("=== SPHERE CLICK RECEIVED ===");
+        Debug.Log($"Processing={isProcessingMove}");
+        if (isProcessingMove || current == null)
+            return;
+        
+        isProcessingMove = true;
+
+        Debug.Log($"[MOVE] {current.name} → {tile} v{vertex}");
+
+        bool moved = current.MoveToTile(tile, vertex);
+        if (!moved)
+        {
+            isProcessingMove = false;
+            return;
+        }
+
         ClearHighlights();
 
-        if (current == null || map == null) return;
+    }
 
-        int range = map.defaultMovePoints;
+    public void HandleMoveFinished()
+    {
+        if (current == null)
+            return;
 
-        var reachable = map.GetReachableVerticesFromPlayerAsPairs(current.gameObject, range);
+        Debug.Log("[TURN] Move finished.");
 
-        foreach (var (tileName, vertexIdx) in reachable)
+        isProcessingMove = false;
+
+        StartNextTurn();
+    }
+
+
+
+    // ---------------- VISUALS ----------------
+    void HighlightValidMoves()
+    {
+        Debug.Log("=== HIGHLIGHT VALID MOVES ===");
+
+        ClearHighlights();
+
+        // 🔒 HARD GUARD: current player
+        if (current == null)
         {
-            Vector3 pos = map.GetVertexPosition(tileName, vertexIdx);
+            Debug.LogError("[HIGHLIGHT] current player is NULL");
+            return;
+        }
 
-            GameObject s = Instantiate(map.vertexMarkerPrefab, pos + Vector3.up * 0.05f, Quaternion.identity);
-            s.transform.localScale = Vector3.one * sphereSize;
+        // 🔑 HARD FIX: resolve map HERE, not in Start()
+        if (map == null)
+        {
+            map = FindObjectOfType<Map1HexGrid>();
+            Debug.Log("[HIGHLIGHT] map was NULL — attempting late bind");
+        }
 
-            // Force material
-            var rend = s.GetComponent<Renderer>();
-            if (sphereMaterial != null)
-                rend.material = sphereMaterial;
-            else
+        if (map == null)
+        {
+            Debug.LogError("[HIGHLIGHT] map STILL NULL — aborting highlight");
+            return;
+        }
+
+        if (!map.hasGenerated)
+        {
+            Debug.LogWarning("[HIGHLIGHT] map exists but not generated yet");
+            return;
+        }
+
+        Debug.Log($"[HIGHLIGHT] Current player: {current.name}");
+        Debug.Log($"[HIGHLIGHT] Move Range = {map.defaultMovePoints}");
+
+        var reachable = map.GetReachableVerticesFromPlayerAsPairs(
+            current.gameObject,
+            map.defaultMovePoints
+        );
+
+        Debug.Log($"[HIGHLIGHT] Reachable count = {reachable.Count}");
+
+        foreach (var pair in reachable)
+        {
+            Vector3 pos = map.GetVertexPosition(pair.tileName, pair.vertexIndex);
+
+            GameObject sphere = Instantiate(
+                map.vertexMarkerPrefab,
+                pos + Vector3.up * 0.05f,
+                Quaternion.identity
+            );
+
+            sphere.transform.localScale = Vector3.one * 0.03f;
+
+            ClickableSphere click = sphere.GetComponent<ClickableSphere>();
+            if (click == null)
             {
-                var mat = new Material(Shader.Find("Unlit/Color"));
-                mat.color = new Color(0.1f, 0.9f, 1f);
-                rend.material = mat;
+                Debug.LogError("[HIGHLIGHT] ClickableSphere missing on prefab");
+                Destroy(sphere);
+                continue;
             }
 
-            var click = s.GetComponent<ClickableSphere>();
-            if (click != null)
-            {
-                click.targetTile = map.GetTileGridCoord(tileName);
-                click.targetVertex = vertexIdx;
-                click.turnManager = this;
-            }
+            click.targetTile = map.GetTileGridCoord(pair.tileName);
+            click.targetVertex = pair.vertexIndex;
+            click.turnManager = this;
 
-            highlights.Add(s);
+            highlights.Add(sphere);
         }
 
         Physics.SyncTransforms();
+
+        Debug.Log($"[HIGHLIGHT] Spawned {highlights.Count} highlight spheres");
     }
 
-    public void ClearHighlights()
+
+
+
+    void ClearHighlights()
     {
-        for (int i = highlights.Count - 1; i >= 0; i--)
-        {
-            if (highlights[i] != null)
-                Destroy(highlights[i]);
-        }
+        foreach (var h in highlights)
+            Destroy(h);
+
         highlights.Clear();
     }
 
-    public void OnSphereClicked(Vector2Int tile, int vertex)
+    public bool IsVertexOccupied(Vector2Int tile, int vertex, PlayerUnit ignore = null)
     {
-        if (isProcessingMove || current == null) return;
-        isProcessingMove = true;
-
-        Debug.Log($"[MOVE] Attempting move to tile {tile} vertex {vertex}");
-
-        if (current.MoveToTile(tile, vertex))
+        foreach (var p in players)
         {
-            Debug.Log("[MOVE] SUCCESS — player moved");
-            ClearHighlights();
-            if (current.movementPoints <= 0 || !current.gameObject.activeSelf)
-                Invoke(nameof(StartNextTurn), 0.5f);
-            else
-                HighlightValidMoves();
-        }
-        else
-        {
-            Debug.LogWarning("[MOVE] FAILED — MoveToTile returned false");
-        }
+            if (p == null || p == ignore) continue;
+            if (!p.gameObject.activeSelf) continue;
 
-        isProcessingMove = false;
-    }
-
-    private int GetClosestVertex(Vector3 tileCenter, Vector3 point)
-    {
-        float bestDist = float.MaxValue;
-        int best = 0;
-        float r = map.hexSize * 0.8f;
-
-        for (int i = 0; i < 6; i++)
-        {
-            float a = i * 60f * Mathf.Deg2Rad;
-            Vector3 v = tileCenter + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
-            float d = Vector3.Distance(v, point);
-            if (d < bestDist)
+            if (p.currentTileCoord == tile &&
+                p.currentVertexIndex == vertex)
             {
-                bestDist = d;
-                best = i;
+                return true;
             }
         }
-        return best;
+        return false;
     }
 
     public void ShowReachFor(GameObject playerObj)
     {
         if (playerObj == null) return;
 
-        var pu = playerObj.GetComponentInChildren<PlayerUnit>(true);
+        PlayerUnit pu = playerObj.GetComponentInChildren<PlayerUnit>(true);
         if (pu == null)
         {
-            Debug.LogError("ShowReachFor: No PlayerUnit found on " + playerObj.name);
+            Debug.LogError("ShowReachFor: No PlayerUnit on " + playerObj.name);
             return;
         }
 
+        PlayerUnit previous = current;
+
         current = pu;
         HighlightValidMoves();
+        current = previous;
     }
+
+    public void RestartTurnsFromBeginning()
+    {
+        StopAllCoroutines();
+        StartCoroutine(RestartTurnsNextFrame());
+    }
+
+    IEnumerator RestartTurnsNextFrame()
+    {
+        yield return null; // wait ONE frame
+
+        ClearHighlights();
+        isProcessingMove = false;
+
+        currentIndex = -1;
+        current = null;
+
+        Debug.Log("=== TURN SYSTEM RESTARTED AFTER MAP READY ===");
+        StartNextTurn();
+    }
+
+    IEnumerator WaitForMapThenStartTurns()
+    {
+        // wait for map instance
+        while (map == null)
+        {
+            map = FindObjectOfType<Map1HexGrid>();
+            yield return null;
+        }
+
+        Debug.Log("[TURN] Map found, waiting for generation...");
+
+        // wait for FULL generation (vertex graph ready)
+        while (!map.hasGenerated || map.vertexToTile == null || map.vertexToTile.Count == 0)
+        {
+            yield return null;
+        }
+
+        Debug.Log("[TURN] Map fully generated. Vertex graph ready.");
+
+        // wait one extra frame for safety
+        yield return null;
+
+        if (players.Count == 0)
+        {
+            Debug.LogError("[TURN] No players registered after map ready!");
+            yield break;
+        }
+
+        Debug.Log($"[TURN] {players.Count} players registered. Starting turns.");
+
+        StartNextTurn();
+    }
+    
+
 }
