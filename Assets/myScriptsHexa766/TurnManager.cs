@@ -74,6 +74,8 @@ public class TurnManager : MonoBehaviour
 
         currentIndex = (currentIndex + 1) % players.Count;
         current = players[currentIndex];
+        Debug.Log($"Current = {current.name}");
+        Debug.Log($"players[0]={players[0].name}, players[1]={players[1].name}, currentIndex={currentIndex}, current={current.name}");
 
         if (current == null)
         {
@@ -225,7 +227,18 @@ public class TurnManager : MonoBehaviour
     void ClearHighlights()
     {
         foreach (var h in highlights)
-            Destroy(h);
+        {
+            if (h == null) continue;
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                DestroyImmediate(h);
+            else
+                Destroy(h);
+#else
+        Destroy(h);
+#endif
+        }
 
         highlights.Clear();
     }

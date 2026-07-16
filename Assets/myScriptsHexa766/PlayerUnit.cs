@@ -37,10 +37,12 @@ public class PlayerUnit : MonoBehaviour
             return;
         }
 
-        // 🔑 REGISTER THIS UNIT WITH THE TURN MANAGER
+        //  REGISTER THIS UNIT WITH THE TURN MANAGER
         if (turnManager != null && !turnManager.players.Contains(this))
         {
             turnManager.players.Add(this);
+            // Always keep Player1 before Player2
+            turnManager.players.Sort((a, b) => a.teamID.CompareTo(b.teamID));
             Debug.Log($"[TURN] Registered player unit: {name}");
         }
         else if (turnManager == null)
