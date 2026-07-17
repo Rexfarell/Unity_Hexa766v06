@@ -326,5 +326,48 @@ public class PlayerUnit : MonoBehaviour
         Debug.Log($"[BOXDOWN] {name} dropped box");
     }
 
+    public void TakeEnvironmentalDamage(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        int originalAmount = amount;
+        int shieldLost = 0;
+        int energyLost = 0;
+
+        // Shield absorbs damage first
+        if (shield > 0)
+        {
+            shieldLost = Mathf.Min(shield, amount);
+            shield -= shieldLost;
+            amount -= shieldLost;
+        }
+
+        // Remaining damage goes to energy
+        if (amount > 0)
+        {
+            energyLost = Mathf.Min(energy, amount);
+            energy -= energyLost;
+        }
+
+        Debug.Log(
+            $"<color=#FF5500><b>☣ CORROSION</b></color> " +
+            $"<color=cyan><b>{name}</b></color>  " +
+            $"<color=yellow>-{shieldLost} Shield</color>  " +
+            $"<color=red>-{energyLost} Energy</color>  " +
+            $"→  <color=yellow>S:{shield}</color>  " +
+            $"<color=lime>E:{energy}</color>"
+        );
+
+        if (energy <= 0)
+        {
+            Debug.Log(
+                $"<color=red><b>☠ UNIT DEPLETED</b></color> " +
+                $"<color=cyan>{name}</color>"
+            );
+
+            // TODO: Game Over / Shutdown animation
+        }
+    }
 
 }

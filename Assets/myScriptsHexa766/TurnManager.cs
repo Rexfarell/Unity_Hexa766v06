@@ -21,6 +21,9 @@ public class TurnManager : MonoBehaviour
 
     // ---------------- CONFIG ----------------
     [Header("Visuals")]
+    [Header("ENVIRONMENT DAMAGE")]
+    [SerializeField]
+    private int environmentalDamage = 25;
     public Material sphereMaterial;
     public float sphereSize = 0.32f;
 
@@ -114,10 +117,24 @@ public class TurnManager : MonoBehaviour
     {
         Debug.Log("=== SPHERE CLICK RECEIVED ===");
         Debug.Log($"Processing={isProcessingMove}");
+
         if (isProcessingMove || current == null)
             return;
-        
+        if (current.energy <= 0)
+        {
+            Debug.Log(
+                $"<color=red><b>☠ {current.name} is depleted and cannot move.</b></color>"
+            );
+            return;
+        }
         isProcessingMove = true;
+
+        // 🔊 Play click/movement sound
+        Map1HexGrid map = FindObjectOfType<Map1HexGrid>();
+        if (map != null)
+        {
+            map.PlayBurstSound(current.transform.position);
+        }
 
         Debug.Log($"[MOVE] {current.name} → {tile} v{vertex}");
 
@@ -128,8 +145,10 @@ public class TurnManager : MonoBehaviour
             return;
         }
 
-        ClearHighlights();
+        // Environmental damage
+        current.TakeEnvironmentalDamage(environmentalDamage);
 
+        ClearHighlights();
     }
 
     public void HandleMoveFinished()
@@ -329,6 +348,37 @@ public class TurnManager : MonoBehaviour
 
         StartNextTurn();
     }
-    
 
+    [ContextMenu("Cycle Environmental Damage")]
+    void CycleEnvironmentalDamage()
+    {
+        switch (environmentalDamage)
+        {
+            case 5:
+                environmentalDamage = 10;
+                break;
+
+            case 10:
+                environmentalDamage = 15;
+                break;
+
+            case 15:
+                environmentalDamage = 20;
+                break;
+
+            case 20:
+                environmentalDamage = 25;
+                break;
+
+            case 25:
+                environmentalDamage = 50;
+                break;
+
+            default:
+                environmentalDamage = 5;
+                break;
+        }
+
+        Debug.Log($"[ENV] Environmental Damage = {environmentalDamage}");
+    }
 }

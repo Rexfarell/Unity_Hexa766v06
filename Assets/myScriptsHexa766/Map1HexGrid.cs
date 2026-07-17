@@ -528,9 +528,14 @@ public class Map1HexGrid : MonoBehaviour
     }
     [Header("SOUND")]
     [SerializeField] public AudioClip cyberBurstSound;
+    [SerializeField]
+    private bool soundMuted = false;
 
     public void PlayBurstSound(Vector3 position)
     {
+        if (soundMuted)
+            return;
+
         if (cyberBurstSound != null)
         {
             AudioSource.PlayClipAtPoint(cyberBurstSound, position, 0.7f);
@@ -540,6 +545,14 @@ public class Map1HexGrid : MonoBehaviour
             Debug.LogWarning("[SOUND] CyberBurst clip missing!");
         }
     }
+
+    [ContextMenu("Toggle Sound")]
+    public void ToggleSound()
+    {
+        soundMuted = !soundMuted;
+        Debug.Log($"[SOUND] {(soundMuted ? "Muted" : "Enabled")}");
+    }
+
     [ContextMenu("Force Clean Dropdowns")]
     void ForceResetDropdowns()
     {
