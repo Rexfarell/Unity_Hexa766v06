@@ -41,10 +41,15 @@ public class TurnManager : MonoBehaviour
     // ---------------- INIT ----------------
     void Start()
     {
-        Debug.Log("[TURN] TurnManager Start");
-        StartCoroutine(WaitForMapThenStartTurns());
+        Debug.Log("[TURN] TurnManager Ready");
     }
 
+    public void BeginMatch()
+    {
+        Debug.Log("[TURN] Beginning Match");
+
+        StartCoroutine(WaitForMapThenStartTurns());
+    }
 
     IEnumerator DelayedStart()
     {
@@ -238,6 +243,7 @@ public class TurnManager : MonoBehaviour
         Physics.SyncTransforms();
 
         Debug.Log($"[HIGHLIGHT] Spawned {highlights.Count} highlight spheres");
+
     }
 
 

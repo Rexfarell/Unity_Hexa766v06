@@ -3,17 +3,28 @@
 [RequireComponent(typeof(Camera))]
 public class CameraFollow : MonoBehaviour
 {
-    [Header("=== TARGET ===")]
+    [Header("Target")]
     public Transform target;
 
-    [Header("=== OFFSET (Relative to Player) ===")]
-    public Vector3 offset = new Vector3(0, 5f, -8f);
+    [Header("Default Offset")]
+    public Vector3 offset = new Vector3(3f, 2f, 4f);
 
-    [Header("=== SMOOTHNESS ===")]
-    [Range(0.01f, 1f)] public float smoothSpeed = 0.3f;
+    [Header("Follow")]
+    [Range(0.01f, 1f)]
+    public float smoothSpeed = 0.125f;
 
-    [Header("=== DEBUG ===")]
-    public bool showGizmos = true;
+    [Header("Zoom")]
+    public float zoomSpeed = 0.5f;
+    public float minZoom = 0.20f;
+    public float maxZoom = 3.5f;
+
+    private Vector3 defaultOffset;
+    private float zoomFactor = 1f;
+
+    void Awake()
+    {
+        defaultOffset = offset;
+    }
 
     void Start()
     {
@@ -22,64 +33,65 @@ public class CameraFollow : MonoBehaviour
 
     void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+            return;
 
         FollowTarget();
     }
 
+    void Update()
+    {
+        HandleZoom();
+
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            zoomFactor = 1f;
+            offset = defaultOffset;
+            SnapToTarget();
+        }
+    }
+
     void FollowTarget()
     {
-        Vector3 desired = target.position + offset;
-        Vector3 smoothed = Vector3.Lerp(transform.position, desired, smoothSpeed);
-        transform.position = smoothed;
-        transform.LookAt(target);
+        Vector3 desiredPosition = target.position + offset;
+
+        transform.position = Vector3.Lerp(
+            transform.position,
+            desiredPosition,
+            smoothSpeed);
+
+        transform.LookAt(target.position);
+    }
+
+    void HandleZoom()
+    {
+        float wheel = Input.GetAxis("Mouse ScrollWheel");
+
+        if (Mathf.Abs(wheel) < 0.001f)
+            return;
+
+        zoomFactor -= wheel * zoomSpeed * zoomFactor;
+
+        zoomFactor = Mathf.Clamp(
+            zoomFactor,
+            minZoom,
+            maxZoom);
+
+        offset = defaultOffset * zoomFactor;
     }
 
     public void SetTarget(Transform newTarget)
     {
         target = newTarget;
         SnapToTarget();
-        Debug.Log($"[CameraFollow] Now following: {target.name} | Offset: {offset}");
     }
 
     void SnapToTarget()
     {
-        if (target != null)
-        {
-            transform.position = target.position + offset;
-            transform.LookAt(target);
-        }
-    }
+        if (target == null)
+            return;
 
-    // VISUALIZE OFFSET IN SCENE VIEW
-    void OnDrawGizmos()
-    {
-        if (!showGizmos || target == null) return;
-
-        Vector3 desired = target.position + offset;
-
-        // Player
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(target.position, 0.5f);
-
-        // Desired camera pos
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(desired, 0.4f);
-        Gizmos.DrawLine(target.position, desired);
-
-        // Label
-#if UNITY_EDITOR
-        UnityEditor.Handles.Label(desired + Vector3.up * 0.6f, $"Offset: {offset}");
-#endif
-    }
-
-    // PRESS 'R' TO TEST OFFSET
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            SnapToTarget();
-            Debug.Log($"[CameraFollow] OFFSET RESET: {offset}");
-        }
+        transform.position = target.position + offset;
+        transform.LookAt(target.position);
     }
 }
