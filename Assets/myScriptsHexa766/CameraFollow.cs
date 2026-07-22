@@ -83,7 +83,7 @@ public class CameraFollow : MonoBehaviour
     public void SetTarget(Transform newTarget)
     {
         target = newTarget;
-        SnapToTarget();
+        
     }
 
     void SnapToTarget()
@@ -94,4 +94,4 @@ public class CameraFollow : MonoBehaviour
         transform.position = target.position + offset;
         transform.LookAt(target.position);
     }
-}
+} 

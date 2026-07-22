@@ -2698,7 +2698,7 @@ GameObject:
   m_Component:
   - component: {fileID: 366715217}
   m_Layer: 0
-  m_Name: CAM_Player1
+  m_Name: CAM_PlayerView1(s)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4231,7 +4231,7 @@ Transform:
   m_GameObject: {fileID: 599260705}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.71968, y: 4.04, z: 12.65}
+  m_LocalPosition: {x: 1.71968, y: 2.56, z: 7.47}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4247,7 +4247,7 @@ GameObject:
   m_Component:
   - component: {fileID: 628468865}
   m_Layer: 0
-  m_Name: CAM_Player2
+  m_Name: CAM_PlayerView2(s)f
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4261,13 +4261,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 628468864}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.2588191, z: 0, w: 0.9659258}
-  m_LocalPosition: {x: -12.351, y: 0.93, z: -0.023}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -13.012, y: 0, z: -0.023}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 30, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &673570314
 GameObject:
   m_ObjectHideFlags: 0
@@ -5192,7 +5192,7 @@ GameObject:
   m_Component:
   - component: {fileID: 724452969}
   m_Layer: 0
-  m_Name: CAM_Pyramid
+  m_Name: CAM_PyramidView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5206,13 +5206,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 724452968}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0.913, y: 3.045, z: -0.258}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.69, y: 2.73, z: -2.761}
   m_LocalScale: {x: 1, y: 1, z: 90}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!43 &730060964
 Mesh:
   m_ObjectHideFlags: 0
@@ -9155,37 +9155,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1425766179
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1425766180}
-  m_Layer: 0
-  m_Name: MAP_CENTER
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1425766180
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1425766179}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 3.51, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1449346474
 GameObject:
   m_ObjectHideFlags: 0
@@ -11186,13 +11155,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MissionIntro
   cameraFollow: {fileID: 1959969158}
   overviewPoint: {fileID: 599260706}
-  overviewTarget: {fileID: 1425766180}
   pyramidPoint: {fileID: 724452969}
   aiStationPoint: {fileID: 2111585139}
   player1Point: {fileID: 366715217}
   player2Point: {fileID: 628468865}
-  pyramid: {fileID: 841548997}
-  aiStation: {fileID: 1927693180}
+  pyramid: {fileID: 724452969}
+  aiStation: {fileID: 2111585139}
   player1: {fileID: 1164669820}
   player2: {fileID: 250444546}
   turnManager: {fileID: 1250414210}
@@ -11207,7 +11175,7 @@ Transform:
   m_GameObject: {fileID: 1806572070}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 14.05877, y: 5, z: 0.52154}
+  m_LocalPosition: {x: 14.05877, y: -0, z: 0.52154}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -14686,7 +14654,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2111585139}
   m_Layer: 0
-  m_Name: CAM_AIStation
+  m_Name: CAM_AIStationView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -14700,13 +14668,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2111585138}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 2.489, z: -7.412}
+  m_LocalRotation: {x: 0.5, y: 0.5, z: -0.5, w: 0.5}
+  m_LocalPosition: {x: -0.296, y: 2.046, z: -9.49}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+  m_LocalEulerAnglesHint: {x: 90, y: 90, z: 0}
 --- !u!1 &2117705432
 GameObject:
   m_ObjectHideFlags: 0
@@ -14909,4 +14877,3 @@ SceneRoots:
   - {fileID: 2111585139}
   - {fileID: 366715217}
   - {fileID: 628468865}
-  - {fileID: 1425766180}
