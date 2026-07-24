@@ -41,11 +41,10 @@ public class MissionIntro : MonoBehaviour
     {
 
 
-        yield return OrbitToTarget(
+        yield return MoveCamera(
             overviewPoint,
             overviewTarget,
-            6f,
-            25f);
+            6f);
 
         yield return new WaitForSeconds(pauseDuration);
 
@@ -87,6 +86,40 @@ public class MissionIntro : MonoBehaviour
         turnManager.BeginMatch();
 
         Destroy(this);
+    }
+
+    IEnumerator MoveCamera(Transform viewPoint, Transform lookTarget, float duration)
+    {
+        Vector3 startPos = Camera.main.transform.position;
+        Quaternion startRot = Camera.main.transform.rotation;
+
+        Vector3 endPos = viewPoint.position;
+        Quaternion endRot =
+            Quaternion.LookRotation(
+                lookTarget.position - endPos,
+                Vector3.up);
+
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            float t = elapsed / duration;
+
+            float s = t * t * (3f - 2f * t);
+
+            Camera.main.transform.position =
+                Vector3.Lerp(startPos, endPos, s);
+
+            Camera.main.transform.rotation =
+                Quaternion.Slerp(startRot, endRot, s);
+
+            elapsed += Time.deltaTime;
+
+            yield return null;
+        }
+
+        Camera.main.transform.position = endPos;
+        Camera.main.transform.rotation = endRot;
     }
 
     IEnumerator OrbitToTarget(Transform viewPoint, Transform lookTarget, float duration, float orbitAngle = 35f)

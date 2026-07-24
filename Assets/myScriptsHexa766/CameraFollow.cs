@@ -18,6 +18,9 @@ public class CameraFollow : MonoBehaviour
     public float minZoom = 0.20f;
     public float maxZoom = 3.5f;
 
+    [Header("Orbit")]
+    public float rotationSpeed = 150f;
+
     private Vector3 defaultOffset;
     private float zoomFactor = 1f;
 
@@ -42,6 +45,7 @@ public class CameraFollow : MonoBehaviour
     void Update()
     {
         HandleZoom();
+        HandleRotation();
 
         if (Input.GetKeyDown(KeyCode.R))
         {
@@ -77,13 +81,34 @@ public class CameraFollow : MonoBehaviour
             minZoom,
             maxZoom);
 
-        offset = defaultOffset * zoomFactor;
+        float currentDistance = offset.magnitude;
+
+        Vector3 direction = offset.normalized;
+
+        currentDistance = defaultOffset.magnitude * zoomFactor;
+
+        offset = direction * currentDistance;
+    }
+
+    void HandleRotation()
+    {
+        if (!Input.GetMouseButton(1))
+            return;
+
+        float delta =
+            Input.GetAxis("Mouse X") *
+            rotationSpeed *
+            Time.deltaTime;
+
+        offset =
+            Quaternion.AngleAxis(delta, Vector3.up) *
+            offset;
     }
 
     public void SetTarget(Transform newTarget)
     {
         target = newTarget;
-        
+        SnapToTarget();
     }
 
     void SnapToTarget()
@@ -94,4 +119,4 @@ public class CameraFollow : MonoBehaviour
         transform.position = target.position + offset;
         transform.LookAt(target.position);
     }
-} 
+}

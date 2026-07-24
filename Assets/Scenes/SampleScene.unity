@@ -5207,7 +5207,7 @@ Transform:
   m_GameObject: {fileID: 724452968}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0.913, y: 3.045, z: -0.258}
+  m_LocalPosition: {x: 1.485, y: 4.806, z: -0.258}
   m_LocalScale: {x: 1, y: 1, z: 90}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -10439,6 +10439,38 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
+--- !u!1 &1722834712
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1722834713}
+  m_Layer: 0
+  m_Name: CameraRig
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1722834713
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1722834712}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.10128, y: -0, z: -2.02133}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1959969153}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1728093452
 GameObject:
   m_ObjectHideFlags: 0
@@ -12704,13 +12736,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1959969152}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.27824715, y: -0.29878846, z: -0.034432605, w: 0.9122052}
-  m_LocalPosition: {x: -7.299, y: 4.307, z: -3.824}
+  m_LocalRotation: {x: 0.17364816, y: 0, z: 0, w: 0.9848078}
+  m_LocalPosition: {x: 0, y: 2, z: -6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 29.148, y: 319.753, z: -15.207}
+  m_Father: {fileID: 1722834713}
+  m_LocalEulerAnglesHint: {x: 20, y: 0, z: 0}
 --- !u!114 &1959969154
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14899,7 +14931,7 @@ SceneRoots:
   - {fileID: 1073442035}
   - {fileID: 1164669820}
   - {fileID: 250444546}
-  - {fileID: 1959969153}
+  - {fileID: 1722834713}
   - {fileID: 1418110802}
   - {fileID: 1938220740}
   - {fileID: 370110953}
