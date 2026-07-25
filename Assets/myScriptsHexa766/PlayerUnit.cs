@@ -395,15 +395,20 @@ public class PlayerUnit : MonoBehaviour
 
     private void UpdateHealthBars()
     {
+        Debug.Log($"[BARS] Unit = {name}");
+        Debug.Log($"Shield Path Parent = {shieldBar.parent.name} | Energy Path Parent = {energyBar.parent.name}");
         Debug.Log($"[BARS] Shield={shield}  Energy={energy}");
 
         if (shieldBar != null)
         {
+            Debug.Log($"Shield Root = {shieldBar.root.name}");
+            Debug.Log($"Shield Scale BEFORE = {shieldBar.localScale}");
             float shieldPercent = Mathf.Clamp01(shield / 100f);
 
             Vector3 scale = shieldBar.localScale;
             scale.x = shieldBarFullWidth * shieldPercent;
             shieldBar.localScale = scale;
+            Debug.Log($"Shield Scale AFTER = {shieldBar.localScale}");
 
             Vector3 pos = shieldBarStartPos;
             pos.x = shieldBarStartPos.x - (shieldBarFullWidth - scale.x) * 0.5f;
@@ -412,11 +417,15 @@ public class PlayerUnit : MonoBehaviour
 
         if (energyBar != null)
         {
+            Debug.Log($"Energy Root = {energyBar.root.name}");
+            Debug.Log($"Energy Scale BEFORE = {energyBar.localScale}");
             float energyPercent = Mathf.Clamp01(energy / 100f);
 
             Vector3 scale = energyBar.localScale;
+            Debug.Log($"Energy Scale AFTER = {energyBar.localScale}");
             scale.x = energyBarFullWidth * energyPercent;
             energyBar.localScale = scale;
+            
 
             Vector3 pos = energyBarStartPos;
             pos.x = energyBarStartPos.x - (energyBarFullWidth - scale.x) * 0.5f;
