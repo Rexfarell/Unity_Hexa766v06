@@ -1,0 +1,49 @@
+# HEXA_766 Technical Handbook
+
+**Project:** HEXA_766
+
+**Author:** Eric Ávila
+
+**Purpose**
+
+HEXA_766 is a serious game developed as the central software artifact of a PhD dissertation in Computer Science Education.
+
+The project combines:
+
+- Serious Games
+- Computational Thinking
+- Debugging
+- Turn-Based Strategy
+- Procedural Generation
+- Educational Game Design
+
+---
+
+## Development Philosophy
+
+The project follows the following engineering principles:
+
+- Every gameplay system should have a single responsibility.
+- Presentation systems should remain independent from gameplay systems.
+- Procedurally generated objects should be generated at runtime.
+- Reusable gameplay objects should become prefabs.
+- Every completed milestone must be documented.
+
+---
+
+## Current Status
+
+Current milestone:
+
+- Strategy Camera V2
+- Mission Intro Cinematic
+- Procedural Hexagonal Map
+- Turn System
+- Player Prefabs
+- Health & Shield System
+
+---
+
+This handbook is a living document.
+
+It must evolve together with the project.

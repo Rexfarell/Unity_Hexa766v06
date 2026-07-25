@@ -1,0 +1,81 @@
+# Prefab Catalog
+
+---
+
+**Document Version:** 0.1
+
+---
+
+# Player.prefab
+
+## Purpose
+
+Represents one playable robot.
+
+---
+
+## Contains
+
+- PlayerUnit
+- Animator
+- HealthCanvas
+
+---
+
+## HealthCanvas
+
+Contains
+
+- ShieldBar
+- EnergyBar
+
+---
+
+## Responsibilities
+
+- Movement
+- Health
+- Shield
+- Animation
+- Environmental damage
+
+---
+
+## Depends On
+
+- TurnManager
+- CameraFollow
+- Map1HexGrid
+
+---
+
+## Known Pitfalls
+
+ShieldBar and EnergyBar must reference the visible child transforms.
+
+Duplicate objects with identical names exist.
+
+Incorrect assignments prevent bar updates.
+
+---
+
+# Player2.prefab
+
+Same structure as Player.prefab.
+
+Only differs in:
+
+- Team ID
+- Spawn location
+
+---
+
+# Runtime Objects
+
+Not prefabs:
+
+- Pyramid
+- AI Station
+- ClickableSphere
+- Procedural Tiles
+- Procedural Vertices

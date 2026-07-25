@@ -1,0 +1,64 @@
+# Development Log
+
+---
+
+## 2026-01-08
+
+### Camera System
+
+Implemented Strategy Camera V2.
+
+Removed obsolete CameraRig.
+
+Implemented:
+
+- Orbit
+- Zoom
+- Recenter
+
+---
+
+### Mission Intro
+
+Corrected orbit interpolation.
+
+Fixed ending position.
+
+---
+
+### Health System
+
+Solved health bar update issue.
+
+Root cause:
+
+Duplicate child transforms with identical names.
+
+---
+
+### Prefabs
+
+Created:
+
+- Player.prefab
+- Player2.prefab
+
+---
+
+### Scene Cleanup
+
+Removed:
+
+- TEST_HEX_TILE
+- TEST_HEX_VISIBLE
+- CameraRig
+
+Created:
+
+Documentation folder.
+
+---
+
+### Documentation
+
+Started Technical Handbook Version 0.1.

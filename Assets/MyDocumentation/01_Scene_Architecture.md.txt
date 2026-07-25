@@ -1,0 +1,42 @@
+# Scene Architecture
+
+## Environment
+
+- Directional Light
+- Global Volume
+
+## Gameplay
+
+- TurnManager
+- MissionDirector
+- Map1
+
+## Players
+
+- Player1 (Prefab)
+- Player2 (Prefab)
+
+## Camera
+
+- Main Camera
+
+## Scene Helpers
+
+- CAM_Overview
+- CAM_Pyramid
+- CAM_AIStation
+- CAM_Player1
+- CAM_Player2
+- MAP_CENTER
+
+---
+
+## Notes
+
+Pyramid and AI Station are procedurally generated.
+
+Camera helper objects are scene-only objects and are not prefabs.
+
+Global Volume contains the post-processing profile used by the game.
+
+The Main Camera is controlled by CameraFollow.

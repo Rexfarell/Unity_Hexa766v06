@@ -1,0 +1,33 @@
+# Changelog
+
+---
+
+## Version 0.1
+
+### Added
+
+- Strategy Camera V2
+- Mouse orbit
+- Mouse wheel zoom
+- Camera recenter
+- Player prefabs
+- Technical handbook
+
+### Fixed
+
+- Mission Intro orbit
+- Health bar references
+- Camera hierarchy
+
+### Removed
+
+- CameraRig
+- Test objects
+
+### Verified
+
+- Camera controls
+- Turn transitions
+- Health bars
+- Environmental damage
+- Mission Intro

@@ -1,0 +1,73 @@
+# Known Issues
+
+---
+
+**Document Version:** 0.1
+
+---
+
+# Current Issues
+
+None considered game-breaking.
+
+---
+
+# Historical Issues
+
+## Health Bars
+
+Problem
+
+Health bars stopped updating.
+
+Cause
+
+Wrong ShieldBar / EnergyBar transform assigned.
+
+Resolution
+
+Assign the visible child transform.
+
+---
+
+## Mission Intro
+
+Problem
+
+Camera finished underneath the map.
+
+Cause
+
+Incorrect serialized reference after camera refactor.
+
+Resolution
+
+Reassign procedural object references.
+
+---
+
+## CameraRig
+
+Problem
+
+Obsolete camera hierarchy remained after CameraFollow rewrite.
+
+Resolution
+
+CameraRig removed.
+
+---
+
+## Procedural Objects
+
+Pyramid and AI Station are generated procedurally.
+
+Serialized references must be assigned after generation.
+
+---
+
+## Scene Helpers
+
+Camera markers are scene objects.
+
+They should never become prefabs.
