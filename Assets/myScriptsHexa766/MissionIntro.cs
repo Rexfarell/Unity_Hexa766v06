@@ -1,12 +1,27 @@
 using System.Collections;
 using UnityEngine;
-
+using TMPro;
+using UnityEngine;
 public class MissionIntro : MonoBehaviour
 {
+   
+
+  
+
+    [Header("Timing")]
+    public float moveDuration = 2f;
+
     [Header("Camera")]
     public CameraFollow cameraFollow;
 
     [Header("Targets")]
+
+    [Header("Gameplay")]
+    public TurnManager turnManager;
+
+    [Header("UI")]
+    public TMP_Text skipCaption;
+
     public Transform overviewPoint;
 
     public Transform overviewTarget;
@@ -21,20 +36,22 @@ public class MissionIntro : MonoBehaviour
     public Transform player1;
     public Transform player2;
 
-    [Header("Gameplay")]
-    public TurnManager turnManager;
+    private Coroutine introCoroutine;
+    private bool introSkipped = false;
 
-    [Header("Timing")]
-    public float moveDuration = 2f;
+    
+    
+
     public float pauseDuration = 1.5f;
 
     void Start()
     {
         Debug.Log("===== MISSION INTRO STARTED =====");
 
-        cameraFollow.enabled = false;
+        if (cameraFollow != null)
+            cameraFollow.enabled = false;
 
-        StartCoroutine(IntroSequence());
+        introCoroutine = StartCoroutine(IntroSequence());
     }
 
     IEnumerator IntroSequence()
@@ -80,12 +97,7 @@ public class MissionIntro : MonoBehaviour
 
         yield return new WaitForSeconds(0.5f);
 
-        cameraFollow.SetTarget(player1);
-        cameraFollow.enabled = true;
-
-        turnManager.BeginMatch();
-
-        Destroy(this);
+        FinishIntro();
     }
 
     IEnumerator MoveCamera(Transform viewPoint, Transform lookTarget, float duration)
@@ -177,5 +189,42 @@ public class MissionIntro : MonoBehaviour
 
         Camera.main.transform.position = endPos;
         Camera.main.transform.LookAt(lookTarget.position);
+    }
+
+    void Update()
+    {
+        if (introSkipped)
+            return;
+
+        if (Input.GetKeyDown(KeyCode.Return) ||
+            Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            Debug.Log("[INTRO] Skipped by player.");
+
+            introSkipped = true;
+
+            if (introCoroutine != null)
+                StopCoroutine(introCoroutine);
+
+            FinishIntro();
+        }
+    }
+
+    void FinishIntro()
+    {
+        if (cameraFollow != null && player1 != null)
+        {
+            cameraFollow.SetTarget(player1);
+            cameraFollow.enabled = true;
+        }
+
+        Debug.Log("[TURN] Beginning Match");
+
+        if (turnManager != null)
+            turnManager.BeginMatch();
+        if (skipCaption != null)
+            Destroy(skipCaption.gameObject);
+
+        Destroy(this);
     }
 }

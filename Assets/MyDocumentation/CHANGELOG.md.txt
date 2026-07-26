@@ -2,7 +2,7 @@
 
 ---
 
-## Version 0.1
+## Version 0.2
 
 ### Added
 
@@ -31,3 +31,12 @@
 - Health bars
 - Environmental damage
 - Mission Intro
+
+# CHANGELOG
+
+## [Unreleased]
+
+### Added
+- Initial technical documentation.
+- Added an on-screen "ENTER · Skip Intro" prompt during the mission intro cinematic.
+- The prompt is automatically removed when gameplay begins.
