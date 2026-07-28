@@ -40,3 +40,15 @@
 - Initial technical documentation.
 - Added an on-screen "ENTER · Skip Intro" prompt during the mission intro cinematic.
 - The prompt is automatically removed when gameplay begins.
+
+## v0.2.0 (Work in Progress)
+
+### Mission Briefing UI Framework
+- Added cinematic intro music.
+- Added "Press ENTER to Skip" functionality.
+- Implemented the UI framework for mission briefing panels.
+- Added Logo, Story, and Mission presentation panels.
+- Corrected UI hierarchy and panel activation logic.
+- Fixed subtitle alignment and clipping issues.
+- Fixed version label placement.
+- Improved intro presentation stability before gameplay begins.

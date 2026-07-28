@@ -1,12 +1,16 @@
 using System.Collections;
-using UnityEngine;
 using TMPro;
 using UnityEngine;
+using UnityEngine;
+using UnityEngine.UI;
 public class MissionIntro : MonoBehaviour
 {
-   
 
-  
+
+    [Header("Intro Panels")]
+    public GameObject logoPanel;
+    public GameObject storyPanel;
+    public GameObject missionPanel;
 
     [Header("Timing")]
     public float moveDuration = 2f;
@@ -18,6 +22,9 @@ public class MissionIntro : MonoBehaviour
 
     [Header("Gameplay")]
     public TurnManager turnManager;
+
+    [Header("Audio")]
+    public AudioSource introMusic;
 
     [Header("UI")]
     public TMP_Text skipCaption;
@@ -39,8 +46,6 @@ public class MissionIntro : MonoBehaviour
     private Coroutine introCoroutine;
     private bool introSkipped = false;
 
-    
-    
 
     public float pauseDuration = 1.5f;
 
@@ -50,6 +55,8 @@ public class MissionIntro : MonoBehaviour
 
         if (cameraFollow != null)
             cameraFollow.enabled = false;
+        if (introMusic != null)
+            introMusic.Play();
 
         introCoroutine = StartCoroutine(IntroSequence());
     }
@@ -57,7 +64,15 @@ public class MissionIntro : MonoBehaviour
     IEnumerator IntroSequence()
     {
 
+        // ------------------------------
+        // Mission briefing UI
+        // ------------------------------
 
+        yield return ShowPanel(logoPanel, 3f);
+
+        yield return ShowPanel(storyPanel, 7f);
+
+        yield return ShowPanel(missionPanel, 4f);
         yield return MoveCamera(
             overviewPoint,
             overviewTarget,
@@ -87,7 +102,7 @@ public class MissionIntro : MonoBehaviour
             5f,
             12f);
 
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(1.5f);
 
         yield return OrbitToTarget(
             player2Point,
@@ -212,19 +227,66 @@ public class MissionIntro : MonoBehaviour
 
     void FinishIntro()
     {
+        if (skipCaption != null)
+            Destroy(skipCaption.gameObject);
+
         if (cameraFollow != null && player1 != null)
         {
             cameraFollow.SetTarget(player1);
             cameraFollow.enabled = true;
         }
 
-        Debug.Log("[TURN] Beginning Match");
-
         if (turnManager != null)
-            turnManager.BeginMatch();
-        if (skipCaption != null)
-            Destroy(skipCaption.gameObject);
+            if (introMusic != null)
+                introMusic.Stop();
+         turnManager.BeginMatch();
+           
 
         Destroy(this);
+    }
+
+    CanvasGroup GetGroup(GameObject panel)
+    {
+        return panel.GetComponent<CanvasGroup>();
+    }
+
+    IEnumerator Fade(CanvasGroup group, float from, float to, float duration)
+    {
+        group.alpha = from;
+
+        float t = 0f;
+
+        while (t < duration)
+        {
+            group.alpha = Mathf.Lerp(from, to, t / duration);
+
+            t += Time.deltaTime;
+
+            yield return null;
+        }
+
+        group.alpha = to;
+    }
+
+    IEnumerator ShowPanel(GameObject panel, float holdTime)
+    {
+        CanvasGroup g = GetGroup(panel);
+
+        panel.SetActive(true);
+
+        // Force Unity to rebuild the UI immediately
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(
+            panel.GetComponent<RectTransform>());
+
+        yield return null;   // Wait one frame so TMP finishes generating the text
+
+        yield return Fade(g, 0f, 1f, 0.75f);
+
+        yield return new WaitForSeconds(holdTime);
+
+        yield return Fade(g, 1f, 0f, 0.75f);
+
+        panel.SetActive(false);
     }
 }
