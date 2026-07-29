@@ -62,3 +62,91 @@ Documentation folder.
 ### Documentation
 
 Started Technical Handbook Version 0.1.
+
+Date
+
+2026-01-08
+
+Title
+
+Narrative Redesign – Archive 766
+
+Objective
+
+Transform the game's introduction from a sequence of UI panels into a cinematic historical reconstruction presented as a recovered archive.
+
+Decisions
+Narrative Perspective
+
+The narrator is no longer an anonymous voice.
+
+The introduction is presented by The Curator, an archaeologist from a distant future who reconstructs historical events from fragmented expedition records.
+
+The Curator's true identity remains intentionally ambiguous. They may be:
+
+Human
+Artificial Intelligence
+Extraterrestrial scholar
+
+This ambiguity is considered part of the game's worldbuilding.
+
+Archive Concept
+
+HEXA_766 now possesses two simultaneous meanings.
+
+Development Origin
+
+The suffix 766 originates from the first tabletop prototype, which contained:
+
+7 red hexagonal tiles
+6 white hexagonal tiles
+6 orange hexagonal tiles
+
+Narrative Meaning
+
+Within the game universe,
+
+Recovered Archive 766
+
+is the designation assigned to the reconstructed expedition records presented to the player.
+
+Canon Established
+
+Holographic Cenotaph
+
+The archaeological monument discovered by humanity.
+
+It protects the archaeological site.
+
+AI Station
+
+The technological system that serves as the physical host of ARCHON.
+
+Recovered alien technology is delivered here to restore the intelligence.
+
+ARCHON
+
+The dormant artificial intelligence.
+
+ARCHON constitutes the central objective of Mission 1.
+
+Players restore ARCHON by recovering alien technology and transporting it to the AI Station.
+
+Screenplay
+
+Approved screenplay sequence:
+
+Recovered Archive 766
+Source Integrity
+Year 2268
+Humanity discovers extraterrestrial remains
+Hidden beyond the Holographic Cenotaph...
+ARCHON
+Description of ARCHON
+Expedition convergence
+Mission Briefing
+Archive Ready
+
+Outcome
+
+This redesign establishes the narrative identity of HEXA_766 and serves as the canonical foundation for future story development, menus, mission briefings, and in-game historical records.

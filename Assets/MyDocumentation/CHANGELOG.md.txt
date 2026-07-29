@@ -52,3 +52,18 @@
 - Fixed subtitle alignment and clipping issues.
 - Fixed version label placement.
 - Improved intro presentation stability before gameplay begins.
+
+CHANGELOG — v0.2 "Archive"
+
+Narrative
+
+Introduced the Archive 766 framing device for the introduction.
+Replaced omniscient exposition with a historical reconstruction narrated by The Curator.
+Established the game's archaeological tone, blending digital humanities, archaeology, and computer science.
+Defined the canonical roles of:
+Holographic Cenotaph (archaeological monument)
+AI Station (physical host of ARCHON)
+ARCHON (dormant non-human artificial intelligence)
+Connected the title HEXA_766 to its in-universe meaning as a recovered archive while preserving its real-world origin from the first tabletop prototype.
+Rewrote the introductory screenplay using the principle "one idea per screen" to improve pacing and dramatic impact.
+Shifted the introduction from a conventional game briefing to an archaeological reconstruction of historical events.

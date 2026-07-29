@@ -65,18 +65,68 @@ public class MissionIntro : MonoBehaviour
     {
 
         // ------------------------------
-        // Mission briefing UI
+        // ARCHIVE 766
         // ------------------------------
 
         yield return ShowPanel(logoPanel, 3f);
 
-        yield return ShowPanel(storyPanel, 7f);
-
-        yield return ShowPanel(missionPanel, 4f);
         yield return MoveCamera(
             overviewPoint,
             overviewTarget,
             6f);
+
+        // Curator narration (Briefing)
+        TMP_Text story = storyPanel.GetComponentInChildren<TMP_Text>();
+        CanvasGroup storyGroup = GetGroup(storyPanel);
+
+        storyPanel.SetActive(true);
+
+        story.text =
+            "Recovered Archive No. 766\n\n" +
+            "loading...";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(2f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "YEAR 2268";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(2f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "Humanity uncovers\n" +
+            "the remains of an extraterrestrial\n" +
+            "civilization.";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(3f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "Hidden beyond the Holographic Cenotaph\n" +
+            "lies something older than recorded history:ARCHON";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(3f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "The most advanced non-human artificial intelligence ever discovered.";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(2f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "Recovered records indicate\n" +
+            "that multiple expeditions\n" +
+            "converged upon the monument\n" +
+            "shortly after its discovery.";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(4f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        storyPanel.SetActive(false);
+
+        yield return ShowPanel(missionPanel, 4f);
 
         yield return new WaitForSeconds(pauseDuration);
 
