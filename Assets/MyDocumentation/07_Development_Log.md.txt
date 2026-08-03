@@ -150,3 +150,34 @@ Archive Ready
 Outcome
 
 This redesign establishes the narrative identity of HEXA_766 and serves as the canonical foundation for future story development, menus, mission briefings, and in-game historical records.
+
+
+Development Log – Mission Intro Polish (Pre-2.0)
+
+Version: 1.9.9 (Pre-2.0 Stable)
+Date: August 2026
+
+Overview
+
+This milestone focused on transforming the mission introduction from a functional prototype into a polished cinematic sequence. The work emphasized visual identity, audiovisual synchronization, and configurability while preserving code stability.
+
+Visual Improvements
+Redesigned the HEXA_766 logo as a holographic projection.
+Implemented independent RGB channel separation (white, blue, cyan).
+Added randomized horizontal offsets to simulate holographic instability.
+Added randomized channel visibility to avoid repetitive animation.
+Implemented a catastrophic synchronization glitch, producing a brief but dramatic signal failure before stabilization.
+Removed the experimental LogoGlass background after determining it detracted from the illusion.
+Adjusted the logo composition to reduce overlap with the battlefield and improve visual hierarchy.
+Audio Improvements
+Replaced the abrupt termination of the intro music with a smooth fade-out.
+Began exposing audio timing values for Inspector-based tuning rather than hardcoded constants.
+Technical Improvements
+Began converting hardcoded cinematic values into configurable Inspector parameters.
+Established a development workflow favoring small, isolated, reversible patches over large code rewrites.
+Improved maintainability by preparing MissionIntro to function as a configurable cinematic controller.
+Lessons Learned
+
+Several debugging sessions revealed that apparent rendering problems originated from UI configuration rather than animation logic. Material assignments, CanvasGroup visibility, and object activation order were identified as critical factors for TextMeshPro holographic effects.
+
+The introduction now serves as a stable baseline for Version 2.0 development.
