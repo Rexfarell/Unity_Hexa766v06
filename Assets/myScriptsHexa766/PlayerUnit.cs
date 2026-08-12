@@ -14,6 +14,8 @@ public class PlayerUnit : MonoBehaviour
     
     public Vector2Int currentTileCoord;
     public int currentVertexIndex = 0;
+
+  
     public System.Action OnMoveFinished;
     public System.Action onActionResolved;
     private bool isResolvingAction = false;
@@ -25,6 +27,13 @@ public class PlayerUnit : MonoBehaviour
     private float shieldBarFullWidth;
     private float energyBarFullWidth;
 
+    private string spawnTileName;
+    private int spawnVertexIndex;
+    private bool isDead = false;
+    public float respawnDelay = 3f;
+
+    private bool turnAlreadyFinished = false;
+
     [SerializeField] private Animator animator;
     [SerializeField] private GameObject carriedBox; // robot internal box
     [SerializeField] private float moveSpeed = 3f;
@@ -32,7 +41,7 @@ public class PlayerUnit : MonoBehaviour
     [Header("Health Bars")]
     [SerializeField] private Transform shieldBar;
     [SerializeField] private Transform energyBar;
-
+    
     void Start()
     {
         map = FindObjectOfType<Map1HexGrid>();
@@ -138,6 +147,11 @@ public class PlayerUnit : MonoBehaviour
     private IEnumerator SmoothMove(List<(string tileName, int vertexIndex)> path)
     {
         isMoving = true;
+        turnAlreadyFinished = false;
+
+        // Start walking animation
+        if (animator != null)
+            animator.SetBool("Walking", true);
 
         foreach (var step in path)
         {
@@ -163,11 +177,30 @@ public class PlayerUnit : MonoBehaviour
 
         isMoving = false;
 
+        // Stop walking animation
+        if (animator != null)
+            animator.SetBool("Walking", false);
+
+        // If the unit died during the move, do not attempt pickup.
+        // The death routine has already started the respawn countdown.
+        if (isDead)
+        {
+            Debug.Log($"[{name}] SmoothMove finished, but unit is dead. DieRoutine will handle the turn.");
+
+            // Do NOT end the turn here.
+            // DieRoutine controls the death-animation delay.
+            yield break;
+        }
+
+        // Normal movement: continue with the existing pickup logic.
         TryPickupBox();
 
         if (!isCarryingBox)
         {
-            turnManager.HandleMoveFinished();
+            turnAlreadyFinished = true;
+
+            if (turnManager != null)
+                turnManager.HandleMoveFinished();
         }
     }
 
@@ -285,6 +318,7 @@ public class PlayerUnit : MonoBehaviour
         }
     }
 
+
     
 
     IEnumerator DropBoxFinalize()
@@ -309,6 +343,12 @@ public class PlayerUnit : MonoBehaviour
         {
             Debug.Log($"[INPUT] B pressed by {name}");
             DropBox();
+        }
+
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            Debug.Log($"K pressed by {name}");
+            Die();
         }
     }
 
@@ -347,6 +387,84 @@ public class PlayerUnit : MonoBehaviour
         Debug.Log($"[BOXDOWN] {name} dropped box");
     }
 
+    public void Die()
+    {
+        if (isDead)
+            return;
+
+        isDead = true;
+        isMoving = false;
+
+        Debug.Log($"[{name}] Unit destroyed.");
+
+        StartCoroutine(DieRoutine());
+    }
+
+    private IEnumerator DieRoutine()
+    {
+        Debug.Log($"[{name}] DieRoutine STARTED");
+
+        if (animator != null)
+        {
+            animator.SetBool("Walking", false);
+            animator.SetTrigger("Die");
+        }
+
+        // Start the respawn countdown independently.
+        StartCoroutine(RespawnRoutine());
+
+        // Give the death animation time to play.
+        yield return new WaitForSeconds(5.0f);
+
+        // If the movement already ended the turn, do NOT advance it again.
+        if (turnAlreadyFinished)
+        {
+            Debug.Log($"[{name}] DieRoutine: turn already finished. No second turn advance.");
+            yield break;
+        }
+
+        // Death happened outside of an active movement completion.
+        Debug.Log($"[{name}] DieRoutine: ending turn after death.");
+
+        turnAlreadyFinished = true;
+
+        if (turnManager != null)
+            turnManager.HandleMoveFinished();
+    }
+    private IEnumerator RespawnRoutine()
+    {
+        Debug.Log($"[{name}] Respawn timer START at {Time.time:F2}");
+
+        yield return new WaitForSeconds(respawnDelay);
+
+        Debug.Log($"[{name}] Respawn timer END at {Time.time:F2}");
+
+        // Restore stats
+        energy = 100;
+        shield = 100;
+
+        // Refresh UI
+        UpdateHealthBars();
+
+        Debug.Log($"[RESPAWN] Energy={energy} Shield={shield}");
+
+        // Ask the map to respawn this player
+        if (map != null)
+        {
+            map.RespawnPlayer(this);
+        }
+
+        // Reset animator
+        if (animator != null)
+        {
+            animator.Rebind();
+            animator.Update(0f);
+        }
+
+        isDead = false;
+        Debug.Log($"[RESPAWN END] {name} final position = {transform.position}");
+        Debug.Log($"[{name}] Respawned.");
+    }
     public void TakeEnvironmentalDamage(int amount)
     {
         if (amount <= 0)
@@ -387,7 +505,7 @@ public class PlayerUnit : MonoBehaviour
                 $"<color=cyan>{name}</color>"
             );
 
-            // TODO: Game Over / Shutdown animation
+            Die();
         }
 
         UpdateHealthBars();

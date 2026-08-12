@@ -462,8 +462,8 @@ public class Map1HexGrid : MonoBehaviour
         Debug.LogError($"[MAP] No grid coord for tile: {tileName}");
         return new Vector2Int(0, 0);
     }
-
-    private void PositionPlayer(GameObject player, TileSelection tileSel, int vertexIdx)
+    
+    public void PositionPlayer(GameObject player, TileSelection tileSel, int vertexIdx)
     {
         if (player == null) return;
 
@@ -472,6 +472,7 @@ public class Map1HexGrid : MonoBehaviour
         pos.y = PlayerTargetY;
 
         player.transform.position = pos;
+        Debug.Log($"[POSITION] Set {player.name} to {player.transform.position}");
         Debug.Log($"[MAP] Positioned {player.name} at {tileName} v{vertexIdx} = {pos}");
 
         var unit = player.GetComponent<PlayerUnit>();
@@ -484,6 +485,24 @@ public class Map1HexGrid : MonoBehaviour
             Debug.Log($"[MAP] Updated {player.name} unit: {gridPos} v{vertexIdx}");
         }
     }
+
+    public void RespawnPlayer(PlayerUnit player)
+    {
+        Debug.Log($"[RESPAWN] Team={player.teamID}");
+        if (player == null) return;
+
+        if (player.teamID == 1)
+        {
+            Debug.Log($"[RESPAWN] Respawning BLUE at {player1Tile} vertex {player1VertexIndex}");
+            PositionPlayer(player.gameObject, player1Tile, player1VertexIndex);
+        }
+        else
+        {
+            Debug.Log($"[RESPAWN] Respawning RED at {player2Tile} vertex {player2VertexIndex}");
+            PositionPlayer(player.gameObject, player2Tile, player2VertexIndex);
+        }
+    }
+    
 
     [ContextMenu("Position Both Players")]
     void PositionBothPlayers()

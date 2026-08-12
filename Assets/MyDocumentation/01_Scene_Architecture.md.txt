@@ -40,3 +40,49 @@ Camera helper objects are scene-only objects and are not prefabs.
 Global Volume contains the post-processing profile used by the game.
 
 The Main Camera is controlled by CameraFollow.
+
+
+
+
+
+# Mission Scene Architecture
+
+## Scene Objects (Not Prefabs)
+
+These objects define the current mission and should remain scene-specific.
+
+### Main Camera
+- Scene object
+- Controlled by CameraFollow
+- Uses SceneAnchors for cinematic positions.
+
+### TurnManager
+- Scene object
+- Coordinates the turn sequence.
+- References PlayerUnits and HexGrid.
+
+### MissionDirector
+- Scene object
+- Controls mission flow.
+- References UI, TurnManager, and gameplay events.
+
+### HexGrid
+- Scene object
+- Generates the playable map.
+- Contains graph and pathfinding information.
+
+### SceneHelpers (recommended: SceneAnchors)
+Purpose:
+Stores Transform markers used by cinematics and camera movement.
+
+Contains:
+- IntroCamera
+- MissionCamera
+- PlayerFocus
+- ObjectiveFocus
+- Other helper transforms
+
+Notes:
+Scene-specific.
+Should NOT be converted into a prefab.
+Contains no gameplay logic.

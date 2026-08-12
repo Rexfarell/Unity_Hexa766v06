@@ -161,7 +161,7 @@ public class TurnManager : MonoBehaviour
         if (current == null)
             return;
 
-        Debug.Log("[TURN] Move finished.");
+        Debug.Log("[TURN] HandleMoveFinished() called");
 
         isProcessingMove = false;
 

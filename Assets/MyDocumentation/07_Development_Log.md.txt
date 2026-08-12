@@ -181,3 +181,55 @@ Lessons Learned
 Several debugging sessions revealed that apparent rendering problems originated from UI configuration rather than animation logic. Material assignments, CanvasGroup visibility, and object activation order were identified as critical factors for TextMeshPro holographic effects.
 
 The introduction now serves as a stable baseline for Version 2.0 development.
+
+## [2026-08-XX] Unit Death, Animation, Respawn, and Turn Transfer Fix
+
+### Issue
+When a PlayerUnit depleted its energy, the unit correctly entered the death sequence and triggered the death animation, but the turn could be transferred prematurely while the unit was still completing its movement coroutine.
+
+This produced an abrupt death sequence in which the next player's turn started before the intended death/respawn flow had completed.
+
+### Investigation
+The death sequence involves three independent processes:
+
+1. `DieRoutine()` triggers the death animation and controls the delayed turn transfer.
+2. `RespawnRoutine()` handles the respawn countdown, stat restoration, health-bar refresh, home-base positioning, and animator reset.
+3. `SmoothMove()` controls movement and normally calls `TurnManager.HandleMoveFinished()` when movement is completed.
+
+Debug logs showed that when a unit died during movement, `SmoothMove()` detected `isDead` and was also calling `HandleMoveFinished()`. This caused the turn to advance immediately, independently of the delay configured in `DieRoutine()`.
+
+The respawn timer itself was confirmed to be working correctly. `RespawnRoutine()` starts its configured countdown and does not immediately respawn the unit.
+
+### Fix
+The death branch in `SmoothMove()` was changed so that it no longer calls `TurnManager.HandleMoveFinished()`.
+
+The death branch now exits the movement coroutine and leaves turn management to `DieRoutine()`.
+
+Normal movement completion remains unchanged:
+
+- `SmoothMove()` completes the movement.
+- `TryPickupBox()` is executed when appropriate.
+- `turnAlreadyFinished` is set.
+- `TurnManager.HandleMoveFinished()` transfers the turn.
+
+When a unit dies during movement:
+
+- The death animation is triggered.
+- `RespawnRoutine()` starts independently.
+- `SmoothMove()` detects `isDead` and exits without advancing the turn.
+- `DieRoutine()` remains responsible for the delayed turn transfer.
+
+### Result
+The death sequence and normal movement sequence are now separated.
+
+Normal movement continues to transfer turns normally, while a unit that dies during movement does not prematurely advance the turn from inside `SmoothMove()`.
+
+The existing respawn system remains responsible for restoring:
+
+- Energy
+- Shield
+- Health bars
+- Home-base position
+- Animator state
+
+This fix preserves the previously working respawn and health-bar behavior while preventing duplicate or premature turn advancement.

@@ -115,3 +115,41 @@ Planned additions include:
 - Card effects
 - Victory conditions
 - Save system
+
+## Unit Death and Respawn
+
+When a PlayerUnit's energy is depleted, the unit enters its death sequence.
+
+The death sequence follows these rules:
+
+1. The unit stops its walking animation.
+2. The `Die` animation trigger is activated.
+3. A respawn countdown begins.
+4. The unit's current turn is considered consumed.
+5. If the unit dies while completing a movement, the movement coroutine must not independently advance the turn.
+6. Turn advancement during the death sequence is handled by the death routine rather than by `SmoothMove()`.
+7. After the respawn delay, the unit:
+   - Restores energy to its starting value.
+   - Restores shield to its starting value.
+   - Updates its health bars.
+   - Returns to its assigned home-base tile and vertex.
+   - Resets its animator state.
+8. The next player's turn begins according to the normal `TurnManager` sequence.
+
+### Death During Movement
+
+A unit may deplete its energy as a consequence of environmental damage encountered during movement.
+
+In this situation, `SmoothMove()` must terminate without calling `TurnManager.HandleMoveFinished()`.
+
+This prevents the turn from being advanced twice or prematurely. The death routine remains responsible for completing the death sequence and transferring the turn.
+
+### Normal Movement
+
+If the unit survives the movement:
+
+- `SmoothMove()` completes normally.
+- The walking animation stops.
+- Box pickup logic is evaluated.
+- `TurnManager.HandleMoveFinished()` is called when appropriate.
+- The next player's turn begins normally.

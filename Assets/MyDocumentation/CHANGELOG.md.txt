@@ -67,3 +67,14 @@ ARCHON (dormant non-human artificial intelligence)
 Connected the title HEXA_766 to its in-universe meaning as a recovered archive while preserving its real-world origin from the first tabletop prototype.
 Rewrote the introductory screenplay using the principle "one idea per screen" to improve pacing and dramatic impact.
 Shifted the introduction from a conventional game briefing to an archaeological reconstruction of historical events.
+
+## [2026-08-XX] - Fixed Unit Death and Turn Transfer
+
+### Fixed
+- Fixed premature turn transfer when a PlayerUnit dies during movement.
+- Prevented `SmoothMove()` from calling `TurnManager.HandleMoveFinished()` when the unit is dead.
+- Kept normal movement turn completion unchanged.
+- Preserved the existing delayed respawn system.
+- Preserved energy/shield restoration and health-bar reset behavior.
+- Preserved home-base respawn positioning.
+- Death turn handling is now controlled by `DieRoutine()`.
