@@ -173,8 +173,13 @@ public class PlayerUnit : MonoBehaviour
             // Update logical position as each vertex is reached.
             currentTileCoord = map.GetTileGridCoord(step.tileName);
             currentVertexIndex = step.vertexIndex;
-        }
 
+            
+        }
+        Debug.Log(
+            $"[MOVE OCCUPANCY FINAL] {name} FINAL = " +
+            $"{currentTileCoord} v{currentVertexIndex}"
+            );
         isMoving = false;
 
         // Stop walking animation
@@ -345,11 +350,7 @@ public class PlayerUnit : MonoBehaviour
             DropBox();
         }
 
-        if (Input.GetKeyDown(KeyCode.K))
-        {
-            Debug.Log($"K pressed by {name}");
-            Die();
-        }
+        
     }
 
     void DropBox()
@@ -465,6 +466,54 @@ public class PlayerUnit : MonoBehaviour
         Debug.Log($"[RESPAWN END] {name} final position = {transform.position}");
         Debug.Log($"[{name}] Respawned.");
     }
+
+    public void TakeAttackDamage(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        if (isDead)
+            return;
+
+        int shieldLost = 0;
+        int energyLost = 0;
+
+        // Shield absorbs damage first.
+        if (shield > 0)
+        {
+            shieldLost = Mathf.Min(shield, amount);
+            shield -= shieldLost;
+            amount -= shieldLost;
+        }
+
+        // Remaining damage goes to energy.
+        if (amount > 0)
+        {
+            energyLost = Mathf.Min(energy, amount);
+            energy -= energyLost;
+        }
+
+        Debug.Log(
+            $"<color=#FF3333><b>⚔ ATTACK DAMAGE</b></color> " +
+            $"<color=cyan><b>{name}</b></color>  " +
+            $"<color=yellow>-{shieldLost} Shield</color>  " +
+            $"<color=red>-{energyLost} Energy</color>  " +
+            $"→ <color=yellow>S:{shield}</color> " +
+            $"<color=lime>E:{energy}</color>"
+        );
+
+        UpdateHealthBars();
+
+        if (energy <= 0)
+        {
+            Debug.Log(
+                $"<color=red><b>☠ ATTACK DEPLETED {name}</b></color>"
+            );
+
+            Die();
+        }
+    }
+
     public void TakeEnvironmentalDamage(int amount)
     {
         if (amount <= 0)
@@ -548,6 +597,34 @@ public class PlayerUnit : MonoBehaviour
             Vector3 pos = energyBarStartPos;
             pos.x = energyBarStartPos.x - (energyBarFullWidth - scale.x) * 0.5f;
             energyBar.localPosition = pos;
+        }
+    }
+
+    public void Attack()
+    {
+        if (isDead || isMoving)
+            return;
+
+        Debug.Log($"[ATTACK] {name} attack started.");
+
+        if (animator != null)
+        {
+            animator.SetBool("Attack", true);
+        }
+    }
+
+    public void FinishAttack()
+    {
+        if (animator != null)
+        {
+            animator.SetBool("Attack", false);
+        }
+
+        Debug.Log($"[ATTACK] {name} attack animation finished.");
+
+        if (turnManager != null)
+        {
+            turnManager.HandleAttackFinished();
         }
     }
 }

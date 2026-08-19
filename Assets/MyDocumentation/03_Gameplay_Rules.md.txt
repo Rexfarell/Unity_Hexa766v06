@@ -153,3 +153,15 @@ If the unit survives the movement:
 - Box pickup logic is evaluated.
 - `TurnManager.HandleMoveFinished()` is called when appropriate.
 - The next player's turn begins normally.
+
+Basic Attack Mechanics
+
+Same-hex attack: When a unit finishes movement on a hex containing hostile unit(s) occupying different vertices, an automatic short-range attack is triggered. The attack plays once and all hostile units sharing that hex receive the attack damage.
+
+Adjacent-hex attack: A hostile unit occupying a vertex of an adjacent hex can be selected as an attack target. The player then presses K to perform Attack1 against the selected target. Only the selected hostile unit receives the damage.
+
+Vertex occupancy: Two units cannot occupy the same vertex. Multiple units may occupy different vertices of the same hex.
+
+Damage: Attack damage is currently 25. Damage is applied to Shield first; remaining damage reduces Energy.
+
+Current status: Implemented and tested.

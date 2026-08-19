@@ -1124,6 +1124,59 @@ public class Map1HexGrid : MonoBehaviour
         }
     }
 
+    public List<Vector2Int> GetAdjacentTileCoords(Vector2Int sourceTile)
+    {
+        List<Vector2Int> adjacentTiles = new List<Vector2Int>();
+        HashSet<Vector2Int> uniqueTiles = new HashSet<Vector2Int>();
+
+        // Look through every vertex belonging to the source tile.
+        foreach (var kvp in vertexToTile)
+        {
+            Vector3 sourceVertex = kvp.Key;
+            string sourceTileName = kvp.Value.tileName;
+
+            Vector2Int sourceCoord = GetTileGridCoord(sourceTileName);
+
+            if (sourceCoord != sourceTile)
+                continue;
+
+            // Find every vertex connected to this source vertex.
+            if (!vertexGraph.TryGetValue(sourceVertex, out List<Vector3> connectedVertices))
+                continue;
+
+            foreach (Vector3 connectedVertex in connectedVertices)
+            {
+                if (!vertexToTile.TryGetValue(connectedVertex, out var connectedInfo))
+                    continue;
+
+                string connectedTileName = connectedInfo.tileName;
+
+                // Ignore connections to another vertex of the same hex.
+                if (connectedTileName == sourceTileName)
+                    continue;
+
+                Vector2Int connectedCoord = GetTileGridCoord(connectedTileName);
+
+                if (uniqueTiles.Add(connectedCoord))
+                {
+                    adjacentTiles.Add(connectedCoord);
+
+                    Debug.Log(
+                        $"[ATTACK ADJACENCY] {sourceTile} -> {connectedCoord} " +
+                        $"via {sourceTileName} v{kvp.Value.vertexIndex} -> " +
+                        $"{connectedTileName} v{connectedInfo.vertexIndex}"
+                    );
+                }
+            }
+        }
+
+        Debug.Log(
+            $"[ATTACK ADJACENCY] Tile {sourceTile} has " +
+            $"{adjacentTiles.Count} adjacent hexes."
+        );
+
+        return adjacentTiles;
+    }
     // ================================================
     // MOVED: WorldToGridCoord — NOW ABOVE GetPlayerTileAndVertex
     // ================================================
@@ -1420,6 +1473,8 @@ public class Map1HexGrid : MonoBehaviour
             lineRenderer.positionCount = 0;
     }
 
+
+
     void Update()
     {
         if (showReachableTiles && hasGenerated)
@@ -1630,5 +1685,6 @@ public class Map1HexGrid : MonoBehaviour
 
         return reachable;
     }
+
 }
 

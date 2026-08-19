@@ -233,3 +233,11 @@ The existing respawn system remains responsible for restoring:
 - Animator state
 
 This fix preserves the previously working respawn and health-bar behavior while preventing duplicate or premature turn advancement.
+
+Basic Attack System Implemented
+
+Implemented and tested the first combat system. Same-hex hostile units trigger an automatic Attack1 animation when movement finishes. 
+Adjacent hostile units require explicit target selection followed by K input. Attack targeting is vertex-specific for adjacent targets 
+while movement restrictions remain vertex-based. Shield-first damage was implemented at 25 damage per attack. Animation Events were configured 
+through PlayerAnimationEvents because the Animator is on the Robot_Blue Variant child rather than the PlayerUnit parent. 
+Tested successfully for both same-hex and adjacent-target attacks.

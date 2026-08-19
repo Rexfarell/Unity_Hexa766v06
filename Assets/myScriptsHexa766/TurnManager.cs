@@ -24,6 +24,9 @@ public class TurnManager : MonoBehaviour
     [Header("ENVIRONMENT DAMAGE")]
     [SerializeField]
     private int environmentalDamage = 25;
+
+    [SerializeField]
+    private int attackDamage = 25;
     public Material sphereMaterial;
     public float sphereSize = 0.32f;
 
@@ -38,6 +41,14 @@ public class TurnManager : MonoBehaviour
     private List<GameObject> highlights = new List<GameObject>();
     private bool isProcessingMove = false;
 
+
+
+    // ---------------- ATTACK STATE ----------------
+    private PlayerUnit selectedAttackTarget;
+    private List<PlayerUnit> pendingAttackTargets = new List<PlayerUnit>();
+    private bool isSelectingAdjacentAttack = false;
+    private List<GameObject> attackHighlights = new List<GameObject>();
+
     // ---------------- INIT ----------------
     void Start()
     {
@@ -51,6 +62,7 @@ public class TurnManager : MonoBehaviour
         StartCoroutine(WaitForMapThenStartTurns());
     }
 
+    
     IEnumerator DelayedStart()
     {
         yield return null; // wait ONE frame for PlayerUnit.Awake()
@@ -82,6 +94,20 @@ public class TurnManager : MonoBehaviour
 
         currentIndex = (currentIndex + 1) % players.Count;
         current = players[currentIndex];
+        // TEMPORARY OCCUPANCY CHECK
+        foreach (PlayerUnit unit in players)
+        {
+            if (unit != null)
+            {
+                Debug.Log(
+                    $"[OCCUPANCY CHECK] {unit.name} | " +
+                    $"World={unit.transform.position} | " +
+                    $"Hex={unit.currentTileCoord} | " +
+                    $"Vertex={unit.currentVertexIndex}"
+                );
+            }
+        }
+
         Debug.Log($"Current = {current.name}");
         Debug.Log($"players[0]={players[0].name}, players[1]={players[1].name}, currentIndex={currentIndex}, current={current.name}");
 
@@ -102,10 +128,8 @@ public class TurnManager : MonoBehaviour
         Debug.Log($"[TURN] Current player: {current.name}");
 
         HighlightValidMoves();
+        HighlightAdjacentAttackTargets();
     }
-
-
-
 
 
     public void TryEndTurn()
@@ -125,6 +149,27 @@ public class TurnManager : MonoBehaviour
 
         if (isProcessingMove || current == null)
             return;
+
+        // ---------------------------------------------------------
+        // ADJACENT ATTACK TARGET SELECTION
+        // ---------------------------------------------------------
+
+        PlayerUnit clickedHostile =
+            GetHostileAtClickedVertex(current, tile, vertex);
+
+        if (clickedHostile != null)
+        {
+            selectedAttackTarget = clickedHostile;
+            isSelectingAdjacentAttack = true;
+
+            Debug.Log(
+                $"[ATTACK SELECT] {current.name} selected " +
+                $"{clickedHostile.name} as adjacent attack target."
+            );
+
+            return;
+        }
+        
         if (current.energy <= 0)
         {
             Debug.Log(
@@ -132,10 +177,42 @@ public class TurnManager : MonoBehaviour
             );
             return;
         }
+
         isProcessingMove = true;
 
-        // 🔊 Play click/movement sound
+        // =========================================================
+        // TEMPORARY ATTACK ADJACENCY TEST
+        // =========================================================
+
         Map1HexGrid map = FindObjectOfType<Map1HexGrid>();
+
+        if (map != null)
+        {
+            List<Vector2Int> adjacent =
+                map.GetAdjacentTileCoords(current.currentTileCoord);
+
+            Debug.Log(
+                $"[ATTACK TEST] {current.name} at {current.currentTileCoord} " +
+                $"has {adjacent.Count} adjacent hexes."
+            );
+
+            foreach (Vector2Int adjacentTile in adjacent)
+            {
+                Debug.Log(
+                    $"[ATTACK TEST] Adjacent tile: {adjacentTile}"
+                );
+            }
+        }
+        else
+        {
+            Debug.LogError("[ATTACK TEST] Map1HexGrid not found!");
+        }
+
+        // =========================================================
+        // EXISTING MOVEMENT CODE
+        // =========================================================
+
+        // 🔊 Play click/movement sound
         if (map != null)
         {
             map.PlayBurstSound(current.transform.position);
@@ -144,11 +221,20 @@ public class TurnManager : MonoBehaviour
         Debug.Log($"[MOVE] {current.name} → {tile} v{vertex}");
 
         bool moved = current.MoveToTile(tile, vertex);
+
+        Debug.Log(
+        $"[POST-MOVE OCCUPANCY] {current.name} " +
+        $"requested={tile} v{vertex} | " +
+        $"currentTileCoord={current.currentTileCoord} | " +
+        $"currentVertexIndex={current.currentVertexIndex}"
+        );
+
         if (!moved)
         {
             isProcessingMove = false;
             return;
         }
+
 
         // Environmental damage
         current.TakeEnvironmentalDamage(environmentalDamage);
@@ -156,6 +242,299 @@ public class TurnManager : MonoBehaviour
         ClearHighlights();
     }
 
+
+    private List<PlayerUnit> GetHostileUnitsOnSameHex(PlayerUnit attacker)
+    {
+        List<PlayerUnit> targets = new List<PlayerUnit>();
+
+        if (attacker == null)
+            return targets;
+
+        foreach (PlayerUnit unit in players)
+        {
+            if (unit == null)
+                continue;
+
+            if (unit == attacker)
+                continue;
+
+            if (unit.teamID == attacker.teamID)
+                continue;
+
+            if (!unit.gameObject.activeSelf)
+                continue;
+
+            if (unit.currentTileCoord == attacker.currentTileCoord)
+            {
+                targets.Add(unit);
+
+                Debug.Log(
+                    $"[ATTACK SAME HEX] {attacker.name} → {unit.name} " +
+                    $"on {attacker.currentTileCoord}"
+                );
+            }
+        }
+
+        Debug.Log(
+            $"[ATTACK SAME HEX] Total targets = {targets.Count}"
+        );
+
+        return targets;
+    }
+
+    private List<PlayerUnit> GetHostileUnitsInAdjacentHexes(PlayerUnit attacker)
+    {
+        List<PlayerUnit> targets = new List<PlayerUnit>();
+
+        if (attacker == null)
+            return targets;
+
+        Map1HexGrid map = FindObjectOfType<Map1HexGrid>();
+
+        if (map == null)
+        {
+            Debug.LogError("[ATTACK ADJACENT] Map1HexGrid not found!");
+            return targets;
+        }
+
+        List<Vector2Int> adjacentTiles =
+            map.GetAdjacentTileCoords(attacker.currentTileCoord);
+
+        foreach (PlayerUnit unit in players)
+        {
+            if (unit == null)
+                continue;
+
+            if (unit == attacker)
+                continue;
+
+            if (unit.teamID == attacker.teamID)
+                continue;
+
+            if (!unit.gameObject.activeSelf)
+                continue;
+
+            if (adjacentTiles.Contains(unit.currentTileCoord))
+            {
+                targets.Add(unit);
+
+                Debug.Log(
+                    $"[ATTACK ADJACENT] Candidate: " +
+                    $"{attacker.name} → {unit.name} " +
+                    $"at {unit.currentTileCoord} v{unit.currentVertexIndex}"
+                );
+            }
+        }
+
+        Debug.Log(
+            $"[ATTACK ADJACENT] Total candidates = {targets.Count}"
+        );
+
+        return targets;
+    }
+    private void HighlightAdjacentAttackTargets()
+    {
+        if (current == null)
+            return;
+
+        Map1HexGrid attackMap = FindObjectOfType<Map1HexGrid>();
+
+        if (attackMap == null)
+        {
+            Debug.LogError("[ATTACK HIGHLIGHT] Map1HexGrid not found!");
+            return;
+        }
+
+        List<PlayerUnit> targets =
+            GetHostileUnitsInAdjacentHexes(current);
+
+        Debug.Log(
+            $"[ATTACK HIGHLIGHT] {current.name} has " +
+            $"{targets.Count} adjacent attack target(s)."
+        );
+
+        foreach (PlayerUnit target in targets)
+        {
+            if (target == null)
+                continue;
+
+            // The target already occupies the exact vertex we want.
+            // Use its existing world position instead of converting
+            // its coordinates back through the map.
+            Vector3 targetPos = target.transform.position;
+
+            GameObject marker = Instantiate(
+                attackMap.vertexMarkerPrefab,
+                targetPos + Vector3.up * 0.60f,
+                Quaternion.identity
+            );
+
+            marker.name = "AttackMarker";
+
+            marker.transform.localScale = Vector3.one * 0.07f;
+
+            ClickableSphere click =
+                marker.GetComponent<ClickableSphere>();
+
+            if (click == null)
+            {
+                Debug.LogError(
+                    "[ATTACK HIGHLIGHT] ClickableSphere missing on marker prefab!"
+                );
+
+                Destroy(marker);
+                continue;
+            }
+
+            // The marker represents this occupied enemy vertex.
+            click.targetTile = target.currentTileCoord;
+            click.targetVertex = target.currentVertexIndex;
+            click.turnManager = this;
+
+            attackHighlights.Add(marker);
+
+            Debug.Log(
+                $"[ATTACK HIGHLIGHT] Marker created for " +
+                $"{target.name} at " +
+                $"{target.currentTileCoord} v{target.currentVertexIndex}"
+            );
+        }
+
+        Physics.SyncTransforms();
+    }
+    private PlayerUnit GetHostileAtClickedVertex(
+    PlayerUnit attacker,
+    Vector2Int tile,
+    int vertex)
+    {
+        if (attacker == null)
+            return null;
+
+        Map1HexGrid map = FindObjectOfType<Map1HexGrid>();
+
+        if (map == null)
+            return null;
+
+        List<Vector2Int> adjacentTiles =
+            map.GetAdjacentTileCoords(attacker.currentTileCoord);
+
+        if (!adjacentTiles.Contains(tile))
+            return null;
+
+        foreach (PlayerUnit unit in players)
+        {
+            if (unit == null)
+                continue;
+
+            if (unit == attacker)
+                continue;
+
+            if (unit.teamID == attacker.teamID)
+                continue;
+
+            if (!unit.gameObject.activeSelf)
+                continue;
+
+            if (unit.currentTileCoord == tile &&
+                unit.currentVertexIndex == vertex)
+            {
+                return unit;
+            }
+        }
+
+        return null;
+    }
+
+    private void ExecuteSelectedAdjacentAttack()
+    {
+        if (current == null)
+            return;
+
+        if (selectedAttackTarget == null)
+        {
+            Debug.Log("[ATTACK] K pressed, but no adjacent target is selected.");
+            return;
+        }
+
+        if (!selectedAttackTarget.gameObject.activeSelf)
+        {
+            Debug.Log("[ATTACK] Selected target is no longer active.");
+            selectedAttackTarget = null;
+            return;
+        }
+
+        Debug.Log(
+            $"[ATTACK] {current.name} attacking selected target " +
+            $"{selectedAttackTarget.name}"
+        );
+
+        pendingAttackTargets.Clear();
+        pendingAttackTargets.Add(selectedAttackTarget);
+
+        isProcessingMove = true;
+        isSelectingAdjacentAttack = false;
+
+        current.Attack();
+    }
+
+    public bool TryAutomaticSameHexAttack(PlayerUnit attacker)
+    {
+        if (attacker == null)
+            return false;
+
+        List<PlayerUnit> targets =
+            GetHostileUnitsOnSameHex(attacker);
+
+        if (targets.Count == 0)
+            return false;
+
+        pendingAttackTargets.Clear();
+        pendingAttackTargets.AddRange(targets);
+
+        Debug.Log(
+            $"[ATTACK SAME HEX] Automatic attack by {attacker.name} " +
+            $"against {targets.Count} hostile unit(s)."
+        );
+
+        isProcessingMove = true;
+        attacker.Attack();
+
+        return true;
+    }
+
+    public void HandleAttackFinished()
+    {
+        if (current == null)
+            return;
+
+        Debug.Log(
+            $"[ATTACK] {current.name} attack resolved. " +
+            $"Targets={pendingAttackTargets.Count}"
+        );
+
+        foreach (PlayerUnit target in pendingAttackTargets)
+        {
+            if (target == null)
+                continue;
+
+            if (!target.gameObject.activeSelf)
+                continue;
+
+            Debug.Log(
+                $"[ATTACK] Damage target: {target.name}"
+            );
+
+            target.TakeAttackDamage(attackDamage);
+        }
+
+        pendingAttackTargets.Clear();
+        selectedAttackTarget = null;
+        isSelectingAdjacentAttack = false;
+
+        isProcessingMove = false;
+
+        StartNextTurn();
+    }
     public void HandleMoveFinished()
     {
         if (current == null)
@@ -163,8 +542,13 @@ public class TurnManager : MonoBehaviour
 
         Debug.Log("[TURN] HandleMoveFinished() called");
 
-        isProcessingMove = false;
+        // Check for automatic same-hex attack first.
+        if (TryAutomaticSameHexAttack(current))
+        {
+            return;
+        }
 
+        isProcessingMove = false;
         StartNextTurn();
     }
 
@@ -253,7 +637,8 @@ public class TurnManager : MonoBehaviour
     {
         foreach (var h in highlights)
         {
-            if (h == null) continue;
+            if (h == null)
+                continue;
 
 #if UNITY_EDITOR
             if (!Application.isPlaying)
@@ -266,6 +651,23 @@ public class TurnManager : MonoBehaviour
         }
 
         highlights.Clear();
+
+        foreach (var h in attackHighlights)
+        {
+            if (h == null)
+                continue;
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                DestroyImmediate(h);
+            else
+                Destroy(h);
+#else
+        Destroy(h);
+#endif
+        }
+
+        attackHighlights.Clear();
     }
 
     public bool IsVertexOccupied(Vector2Int tile, int vertex, PlayerUnit ignore = null)
@@ -386,5 +788,19 @@ public class TurnManager : MonoBehaviour
         }
 
         Debug.Log($"[ENV] Environmental Damage = {environmentalDamage}");
+    }
+
+    void Update()
+    {
+        if (current == null)
+            return;
+
+        if (isProcessingMove)
+            return;
+
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            ExecuteSelectedAdjacentAttack();
+        }
     }
 }

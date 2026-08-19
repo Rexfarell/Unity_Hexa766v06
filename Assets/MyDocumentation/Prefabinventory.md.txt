@@ -1,0 +1,28 @@
+# Prefab Inventory
+
+## UI
+
+IntroCanvas
+Status: Stable
+Location:
+Assets/Prefabs/UI
+
+Contains:
+- LogoPanel
+- StoryPanel
+- MissionPanel
+- SkipCaption
+
+---
+
+## Gameplay
+
+PlayerUnit
+
+Status: Stable
+
+Contains:
+- Animator
+- Movement
+- TeamID
+- Audio

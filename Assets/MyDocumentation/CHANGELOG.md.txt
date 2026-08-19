@@ -78,3 +78,7 @@ Shifted the introduction from a conventional game briefing to an archaeological 
 - Preserved energy/shield restoration and health-bar reset behavior.
 - Preserved home-base respawn positioning.
 - Death turn handling is now controlled by `DieRoutine()`.
+
+08/18/2026
+Basic combat system with automatic same-hex attacks and manually selected adjacent attacks using K. 
+Added shield-first attack damage and attack animation event handling.

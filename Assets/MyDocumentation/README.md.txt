@@ -62,3 +62,7 @@ Major systems implemented:
 - Player Prefabs
 - Mission Intro
 - Health System
+
+Alpha 0.2
+
+[Next version] Added initial melee/adjacent attack mechanics and basic combat damage.

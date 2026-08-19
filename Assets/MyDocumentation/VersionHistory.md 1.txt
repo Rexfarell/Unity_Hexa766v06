@@ -1,0 +1,8 @@
+### Version 1.9.9
+
+Mission Intro Polish
+
+- RGB hologram effect
+- Catastrophic glitch
+- Inspector configuration
+- Audio fade-out
