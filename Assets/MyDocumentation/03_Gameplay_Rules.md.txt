@@ -165,3 +165,133 @@ Vertex occupancy: Two units cannot occupy the same vertex. Multiple units may oc
 Damage: Attack damage is currently 25. Damage is applied to Shield first; remaining damage reduces Energy.
 
 Current status: Implemented and tested.
+
+# Gameplay Rules
+
+## Match objective
+
+Players compete to recover and deliver AI components to the AI Station.
+
+## v0.8 primary rule
+
+There is exactly **one objective box in circulation at a time**.
+
+The box may be on the map or carried by a player, but a second objective box must not be generated until the active box has been successfully delivered.
+
+## Box lifecycle
+
+### Spawn
+
+At match start, one box is placed at a valid reachable board location.
+
+### Pickup
+
+A player picks up the box by reaching its exact tile and vertex under the existing pickup rules.
+
+### Carrying
+
+While carried:
+
+- The player becomes the current carrier.
+- The original objective remains the same box in circulation.
+- No replacement box is spawned.
+
+### Carrier death
+
+If the carrier dies:
+
+- The carried box returns to the board using the existing death-drop behavior.
+- The box is not consumed.
+- No replacement box is spawned.
+- The contest continues around the dropped box.
+
+### Delivery
+
+A player who reaches the AI Station delivery center while carrying the box completes delivery.
+
+On successful delivery:
+
+- The box is consumed.
+- The player receives +1 delivery score.
+- Existing delivery animation, camera, pulse, banner, and audio feedback play.
+- If the player's new score is below 3, a replacement objective box is spawned.
+- If the player's new score reaches 3, the match ends instead.
+
+## Victory
+
+The first player to deliver **three boxes** wins.
+
+Recommended final sequence:
+
+```text
+Third delivery
+→ BoxDown
+→ delivery pulse/audio
+→ score becomes 3
+→ brief camera/score feedback
+→ no replacement box
+→ no next gameplay turn
+→ result screen
+```
+
+## Fairness
+
+Fairness does not require both players to be equally distant from the objective.
+
+A deliberately asymmetric state is valid when meaningful counterplay exists.
+
+Example:
+
+```text
+Player 1:
+3 steps from box
+
+Player 2:
+8 steps from box
+1 step from useful power-up
+```
+
+The game should permit these situations when the second player has a credible tactical alternative.
+
+## Power-ups — planned
+
+Power-ups are secondary objectives intended to create counterplay.
+
+Potential effects:
+
+- Shield restoration.
+- Energy restoration.
+- Attack boost.
+- Temporary movement boost.
+- Restricted teleportation if development time permits.
+- Temporary disruption effects if development time permits.
+
+Power-ups should usually be immediate, temporary, or consumable.
+
+## Hostile drone hive — future phase
+
+Neutral hostile drones will eventually stalk and attack players.
+
+Their purpose is to:
+
+- Threaten carriers.
+- Complicate routes.
+- Create zones of danger.
+- Prevent objective play from becoming a pure shortest-path race.
+- Add tactical pressure independent of the competing player.
+
+Carrying the objective may increase drone attention, but drone behavior should remain understandable and should not simply punish whichever player is leading.
+
+## Strategic design target
+
+Players should repeatedly face meaningful choices between:
+
+- Racing for the box.
+- Attacking the opponent.
+- Intercepting a carrier.
+- Seeking a power-up.
+- Denying a power-up.
+- Choosing a safer route.
+- Exploiting or avoiding drone pressure.
+
+The board should create counterplay, not guaranteed equality.

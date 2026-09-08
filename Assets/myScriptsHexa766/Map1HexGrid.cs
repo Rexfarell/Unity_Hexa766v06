@@ -245,6 +245,14 @@ public class Map1HexGrid : MonoBehaviour
     [Range(0, 5)]
     public int player2VertexIndex = 0;
 
+    [Header("CUSTOM BOX PLACEMENT")]
+    public GameObject testBox;
+
+    public TileSelection testBoxTile = TileSelection.Tile00;
+
+    [Range(0, 5)]
+    public int testBoxVertexIndex = 0;
+
     [SerializeField, HideInInspector] private int _player1TileBackup;
     [SerializeField, HideInInspector] private int _player2TileBackup;
 
@@ -400,6 +408,11 @@ public class Map1HexGrid : MonoBehaviour
             if (preservedPlayer1 != null)
             {
                 Player1 = preservedPlayer1;
+
+                Debug.Log(
+                    $"<color=magenta><b>[PLACEMENT INPUT]</b></color> " +
+                    $"Player1 Tile={player1Tile} Vertex={player1VertexIndex}"
+);
                 PositionPlayer(Player1, player1Tile, player1VertexIndex);
                 EnsurePlayerFeedback(Player1);
 
@@ -420,6 +433,17 @@ public class Map1HexGrid : MonoBehaviour
             hasGenerated = true;
             Debug.Log($"[MAP] SUCCESS — vertexToTile has {vertexToTile.Count} entries");
             Debug.Log("MAP INSTANCE = " + GetInstanceID());
+
+            if (Application.isPlaying)
+            {
+                TurnManager tm = FindObjectOfType<TurnManager>();
+
+                if (tm != null)
+                {
+                    Debug.Log("[MAP] Restarting turn system after GenerateAndPosition.");
+                    tm.RestartTurnsFromBeginning();
+                }
+            }
         }
         catch (System.Exception e)
         {
@@ -430,7 +454,49 @@ public class Map1HexGrid : MonoBehaviour
 
     }
 
+    [ContextMenu("Position Test Box")]
+    public void PositionTestBox()
+    {
+        if (testBox == null)
+        {
+            Debug.LogWarning("[BOX PLACEMENT] Test Box is not assigned.");
+            return;
+        }
 
+        string tileName =
+            tileNameMap.ContainsKey(testBoxTile)
+            ? tileNameMap[testBoxTile]
+            : null;
+
+        if (string.IsNullOrEmpty(tileName))
+        {
+            Debug.LogError("[BOX PLACEMENT] Invalid tile selection.");
+            return;
+        }
+
+        Vector3 pos =
+            GetVertexPosition(tileName, testBoxVertexIndex);
+
+        testBox.transform.position = pos;
+
+        WorldBox box = testBox.GetComponent<WorldBox>();
+
+        if (box != null)
+        {
+            Vector2Int coord =
+                GetTileGridCoord(tileName);
+
+            box.tileX = coord.x;
+            box.tileY = coord.y;
+            box.vertexIndex = testBoxVertexIndex;
+            box.WorldVertexPosition = pos;
+        }
+
+        Debug.Log(
+            $"[BOX PLACEMENT] {testBox.name} placed at " +
+            $"{tileName} vertex {testBoxVertexIndex}"
+        );
+    }
 
     private void EnsurePlayerFeedback(GameObject player)
     {
@@ -439,7 +505,7 @@ public class Map1HexGrid : MonoBehaviour
         var feedback = player.GetComponent<PlayerClickFeedback>();
         if (feedback == null)
         {
-            feedback = player.AddComponent<PlayerClickFeedback>();
+            //feedback = player.AddComponent<PlayerClickFeedback>();
             Debug.Log($"[MAP] Added PlayerClickFeedback to {player.name}");
         }
 
@@ -615,28 +681,25 @@ public class Map1HexGrid : MonoBehaviour
     {
         tileGameObjectMap = new Dictionary<string, GameObject>();
         landmarks = new Dictionary<string, GameObject>();
-        ForceResetDropdowns();
+
+        // Keep custom Inspector placement values.
+        // ForceResetDropdowns();
     }
 
-
-
     [UnityEditor.Callbacks.DidReloadScripts]
+   
     private static void OnScriptsReloaded()
     {
         if (UnityEditor.EditorApplication.isPlaying)
         {
-            Debug.LogWarning("[EDITOR] Scripts reloaded → Stopping Play Mode to prevent bugs.");
+            Debug.LogWarning(
+                "[EDITOR] Scripts reloaded → Stopping Play Mode to prevent bugs."
+            );
+
             UnityEditor.EditorApplication.isPlaying = false;
         }
 
-        if (!UnityEditor.EditorApplication.isPlaying)
-        {
-            var map = UnityEngine.Object.FindObjectOfType<Map1HexGrid>();
-            if (map != null)
-            {
-                map.ForceResetDropdowns();
-            }
-        }
+        // Do NOT reset custom placement selections after compiling.
     }
 
     void OnValidate()//default placement of players
@@ -1122,6 +1185,52 @@ public class Map1HexGrid : MonoBehaviour
                 }
             }
         }
+
+        // =====================================================
+        // SPECIAL AI STATION CENTER NODE
+        // vertex 6 = center platform
+        // =====================================================
+        Debug.Log("[AI CENTER TEST] Reached AI center setup.");
+        if (tileGameObjectMap.ContainsKey("AIStation"))
+        {
+            Vector3 center =
+                GetVertexPosition("AIStation", 6);
+
+            // Register the center as AIStation vertex 6
+            vertexToTile[center] = ("AIStation", 6);
+
+            if (!vertexGraph.ContainsKey(center))
+                vertexGraph[center] = new List<Vector3>();
+
+            // Connect center to all six perimeter vertices
+            for (int i = 0; i < 6; i++)
+            {
+                Vector3 outer =
+                    GetVertexPosition("AIStation", i);
+
+                if (!vertexGraph.ContainsKey(outer))
+                {
+                    Debug.LogWarning(
+                        $"[AI CENTER] AIStation v{i} missing from graph."
+                    );
+
+                    continue;
+                }
+
+                // center -> perimeter
+                if (!vertexGraph[center].Contains(outer))
+                    vertexGraph[center].Add(outer);
+
+                // perimeter -> center
+                if (!vertexGraph[outer].Contains(center))
+                    vertexGraph[outer].Add(center);
+            }
+
+            Debug.Log(
+                $"[AI CENTER] AIStation v6 added with " +
+                $"{vertexGraph[center].Count} connections."
+            );
+        }
     }
 
     public List<Vector2Int> GetAdjacentTileCoords(Vector2Int sourceTile)
@@ -1195,16 +1304,20 @@ public class Map1HexGrid : MonoBehaviour
         return new Vector2Int(q, r);
     }
 
-    private (string tileName, int vertexIndex) GetPlayerTileAndVertex(GameObject player)
+    public (string tileName, int vertexIndex) GetPlayerTileAndVertex(GameObject player)
     {
         if (player == null) return (null, -1);
 
-        // ADD THESE TWO LINES — EARLY EXIT IF MAP NOT READY
         Debug.Log("MAP INSTANCE = " + GetInstanceID());
         Debug.Log("vertex count = " + vertexToTile.Count);
+
         if (vertexToTile == null || vertexToTile.Count == 0)
         {
-            Debug.LogWarning($"[REACH] vertexToTile dictionary is empty! Map generation not complete yet. Player: {player.name}");
+            Debug.LogWarning(
+                $"[REACH] vertexToTile dictionary is empty! " +
+                $"Map generation not complete yet. Player: {player.name}"
+            );
+
             return (null, -1);
         }
 
@@ -1219,6 +1332,7 @@ public class Map1HexGrid : MonoBehaviour
         {
             Vector3 vertexPos = kvp.Key;
             float dist = Vector3.Distance(playerPos, vertexPos);
+
             if (dist < minDist)
             {
                 minDist = dist;
@@ -1227,12 +1341,19 @@ public class Map1HexGrid : MonoBehaviour
             }
         }
 
-        Debug.Log($"[DEBUG] Nearest: {bestTile} v{bestVertex} (dist: {minDist:F3})");
+        Debug.Log(
+            $"[DEBUG] Nearest: {bestTile} v{bestVertex} " +
+            $"(dist: {minDist:F3})"
+        );
 
         if (minDist < 0.5f)
             return (bestTile, bestVertex);
 
-        Debug.LogError($"[FATAL] Player {player.name} at {playerPos} has no vertex! (nearest dist: {minDist:F3}) Regenerate map.");
+        Debug.LogError(
+            $"[FATAL] Player {player.name} at {playerPos} has no vertex! " +
+            $"(nearest dist: {minDist:F3}) Regenerate map."
+        );
+
         return (null, -1);
     }
 
@@ -1355,19 +1476,35 @@ public class Map1HexGrid : MonoBehaviour
         Debug.Log($"[MAP] Generation COMPLETE — vertexToTile has {vertexToTile.Count} entries. Ready for pathfinding.");
     }
 
-    
+
 
     public Vector3 GetVertexPosition(string tileName, int vertexIndex)
     {
         if (!tileGameObjectMap.ContainsKey(tileName))
         {
-            Debug.LogError($"[ERROR] GetVertexPosition: Tile '{tileName}' not found in tileGameObjectMap!");
+            Debug.LogError(
+                $"[ERROR] GetVertexPosition: Tile '{tileName}' not found in tileGameObjectMap!"
+            );
+
             return Vector3.zero;
         }
 
         GameObject tile = tileGameObjectMap[tileName];
+
+        // -------------------------------------------------
+        // SPECIAL AI STATION CENTER
+        // AIStation vertices 0-5 = normal perimeter
+        // AIStation vertex 6   = center platform
+        // -------------------------------------------------
+        if (tileName == "AIStation" && vertexIndex == 6)
+        {
+            return RoundToGrid(tile.transform.position);
+        }
+
+        // Normal hex vertices 0-5
         float radius = hexSize * 0.8f;
         float angle = vertexIndex * 60f * Mathf.Deg2Rad;
+
         Vector3 pos = tile.transform.position + new Vector3(
             Mathf.Cos(angle) * radius,
             0f,

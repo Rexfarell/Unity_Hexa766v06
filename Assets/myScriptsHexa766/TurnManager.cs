@@ -27,6 +27,11 @@ public class TurnManager : MonoBehaviour
 
     [SerializeField]
     private int attackDamage = 25;
+
+    [Header("ATTACK MARKER")]
+    [SerializeField]
+    private GameObject attackMarkerPrefab;
+
     public Material sphereMaterial;
     public float sphereSize = 0.32f;
 
@@ -48,6 +53,11 @@ public class TurnManager : MonoBehaviour
     private List<PlayerUnit> pendingAttackTargets = new List<PlayerUnit>();
     private bool isSelectingAdjacentAttack = false;
     private List<GameObject> attackHighlights = new List<GameObject>();
+
+    [Header("ATTACK VISUAL EFFECTS")]
+    [SerializeField] private ElectricArcEffect electricArcPrefab;
+    [Header("DAMAGE FEEDBACK")]
+    [SerializeField] private FloatingDamageText damageTextPrefab;
 
     // ---------------- INIT ----------------
     void Start()
@@ -90,10 +100,16 @@ public class TurnManager : MonoBehaviour
         }
 
         ClearHighlights();
-        isProcessingMove = false;
 
         currentIndex = (currentIndex + 1) % players.Count;
         current = players[currentIndex];
+
+        if (current == null)
+        {
+            Debug.LogError("[TURN] Current player is NULL");
+            return;
+        }
+
         // TEMPORARY OCCUPANCY CHECK
         foreach (PlayerUnit unit in players)
         {
@@ -109,29 +125,120 @@ public class TurnManager : MonoBehaviour
         }
 
         Debug.Log($"Current = {current.name}");
-        Debug.Log($"players[0]={players[0].name}, players[1]={players[1].name}, currentIndex={currentIndex}, current={current.name}");
 
-        if (current == null)
+        Debug.Log(
+            $"players[0]={players[0].name}, " +
+            $"players[1]={players[1].name}, " +
+            $"currentIndex={currentIndex}, " +
+            $"current={current.name}"
+        );
+
+        // -------------------------------------------------
+        // CRITICAL FIX:
+        // Do NOT create a turn for a unit that is still dead.
+        // -------------------------------------------------
+        if (current.IsDead)
         {
-            Debug.LogError("[TURN] Current player is NULL");
+            Debug.Log(
+                $"[TURN WAIT] {current.name} is still dead. " +
+                $"Waiting for respawn before starting its turn."
+            );
+
+            // Lock interaction while waiting.
+            isProcessingMove = true;
+
+            StartCoroutine(
+                WaitForRespawnThenBeginTurn(current)
+            );
+
             return;
         }
 
-        current.ResetTurn(); // ✅ THIS EXISTS
+        BeginCurrentTurn();
+    }
+
+    private IEnumerator WaitForRespawnThenBeginTurn(PlayerUnit player)
+    {
+        if (player == null)
+            yield break;
+
+        Debug.Log(
+            $"[TURN WAIT] Waiting for {player.name} respawn..."
+        );
+
+        while (player != null && player.IsDead)
+        {
+            yield return null;
+        }
+
+        if (player == null)
+        {
+            Debug.LogWarning(
+                "[TURN WAIT] Player disappeared while waiting for respawn."
+            );
+
+            yield break;
+        }
+
+        // Safety check:
+        // only continue if this is still the player whose turn
+        // we were waiting to start.
+        if (current != player)
+        {
+            Debug.LogWarning(
+                $"[TURN WAIT] {player.name} respawned, " +
+                $"but current player changed to " +
+                $"{current?.name}. Turn start cancelled."
+            );
+
+            yield break;
+        }
+
+        Debug.Log(
+            $"[TURN WAIT] {player.name} respawn complete at " +
+            $"{player.transform.position}. Starting turn now."
+        );
+
+        BeginCurrentTurn();
+    }
+
+    private void BeginCurrentTurn()
+    {
+        if (current == null)
+        {
+            Debug.LogError(
+                "[TURN] BeginCurrentTurn called with current == NULL"
+            );
+
+            return;
+        }
+
+        // Interaction is now safe again.
+        isProcessingMove = false;
+
+        Debug.Log(
+            $"[PROCESSING STATE] FALSE — TURN READY | " +
+            $"Current={current.name}"
+        );
+
+        current.ResetTurn();
 
         CameraFollow cam = FindObjectOfType<CameraFollow>();
+
         if (cam != null)
         {
             cam.SetTarget(current.transform);
         }
 
-        Debug.Log($"[TURN] Current player: {current.name}");
+        Debug.Log(
+            $"[TURN] Current player: {current.name} | " +
+            $"World={current.transform.position} | " +
+            $"IsDead={current.IsDead}"
+        );
 
         HighlightValidMoves();
         HighlightAdjacentAttackTargets();
     }
-
-
     public void TryEndTurn()
     {
         if (isProcessingMove || current == null)
@@ -155,21 +262,23 @@ public class TurnManager : MonoBehaviour
         // ---------------------------------------------------------
 
         PlayerUnit clickedHostile =
-            GetHostileAtClickedVertex(current, tile, vertex);
+      GetHostileAtClickedVertex(current, tile, vertex);
 
         if (clickedHostile != null)
         {
             selectedAttackTarget = clickedHostile;
-            isSelectingAdjacentAttack = true;
 
             Debug.Log(
                 $"[ATTACK SELECT] {current.name} selected " +
                 $"{clickedHostile.name} as adjacent attack target."
             );
 
+            // Adjacent attack now happens immediately.
+            ExecuteSelectedAdjacentAttack();
+
             return;
         }
-        
+
         if (current.energy <= 0)
         {
             Debug.Log(
@@ -179,6 +288,11 @@ public class TurnManager : MonoBehaviour
         }
 
         isProcessingMove = true;
+
+        Debug.Log(
+            $"[PROCESSING STATE] TRUE — MOVEMENT START | " +
+            $"Current={current?.name}"
+        );
 
         // =========================================================
         // TEMPORARY ATTACK ADJACENCY TEST
@@ -363,8 +477,16 @@ public class TurnManager : MonoBehaviour
             // its coordinates back through the map.
             Vector3 targetPos = target.transform.position;
 
+            if (attackMarkerPrefab == null)
+            {
+                Debug.LogError(
+                    "[ATTACK HIGHLIGHT] Attack Marker Prefab is not assigned!"
+                );
+                return;
+            }
+
             GameObject marker = Instantiate(
-                attackMap.vertexMarkerPrefab,
+                attackMarkerPrefab,
                 targetPos + Vector3.up * 0.60f,
                 Quaternion.identity
             );
@@ -472,6 +594,12 @@ public class TurnManager : MonoBehaviour
         pendingAttackTargets.Add(selectedAttackTarget);
 
         isProcessingMove = true;
+
+        Debug.Log(
+            $"[PROCESSING STATE] TRUE — MOVEMENT START | " +
+            $"Current={current?.name}" +
+            $"Target={selectedAttackTarget?.name}"
+        );
         isSelectingAdjacentAttack = false;
 
         current.Attack();
@@ -497,18 +625,23 @@ public class TurnManager : MonoBehaviour
         );
 
         isProcessingMove = true;
+
+        Debug.Log(
+            $"[PROCESSING STATE] TRUE — MOVEMENT START | " +
+            $"Attacker={attacker.name}"
+        );
         attacker.Attack();
 
         return true;
     }
 
-    public void HandleAttackFinished()
+    public void HandleAttackImpact()
     {
         if (current == null)
             return;
 
         Debug.Log(
-            $"[ATTACK] {current.name} attack resolved. " +
+            $"[ATTACK IMPACT] Resolving damage for {current.name}. " +
             $"Targets={pendingAttackTargets.Count}"
         );
 
@@ -521,11 +654,71 @@ public class TurnManager : MonoBehaviour
                 continue;
 
             Debug.Log(
-                $"[ATTACK] Damage target: {target.name}"
+                $"[ATTACK IMPACT] Damage target: {target.name}"
             );
 
-            target.TakeAttackDamage(attackDamage);
+            // Spawn the electric arc at the exact impact frame.
+            if (electricArcPrefab != null &&
+                current.AttackOrigin != null &&
+                target.HitPoint != null)
+            {
+
+                Debug.Log(
+    $"[ARC DEBUG] Attacker={current.name} | " +
+    $"Origin={current.AttackOrigin?.name} " +
+    $"Pos={(current.AttackOrigin != null ? current.AttackOrigin.position.ToString() : "NULL")} | " +
+    $"Target={target.name} | " +
+    $"HitPoint={target.HitPoint?.name} " +
+    $"Pos={(target.HitPoint != null ? target.HitPoint.position.ToString() : "NULL")}"
+);
+                ElectricArcEffect arc =
+    Instantiate(
+        electricArcPrefab,
+        Vector3.zero,
+        Quaternion.identity
+            );
+
+                arc.Initialize(
+                    current.AttackOrigin,
+                    target.HitPoint
+                );
+            }
+            else
+            {
+                if (electricArcPrefab == null)
+                    Debug.LogWarning("[ELECTRIC ARC] Prefab is not assigned.");
+
+                if (current.AttackOrigin == null)
+                    Debug.LogWarning(
+                        $"[ELECTRIC ARC] {current.name} has no AttackOrigin."
+                    );
+
+                if (target.HitPoint == null)
+                    Debug.LogWarning(
+                        $"[ELECTRIC ARC] {target.name} has no HitPoint."
+                    );
+            }
+
+            // Gameplay damage remains exactly where it already worked.
+            var damageResult =
+                target.TakeAttackDamage(attackDamage);
+
+            ShowDamageText(
+                target,
+                damageResult.shieldLost,
+                damageResult.energyLost
+            );
         }
+    }
+    public void HandleAttackFinished()
+    {
+        if (current == null)
+            return;
+
+        Debug.Log(
+            $"[ATTACK] {current.name} attack finished. " +
+            $"Targets={pendingAttackTargets.Count}"
+        );
 
         pendingAttackTargets.Clear();
         selectedAttackTarget = null;
@@ -542,13 +735,31 @@ public class TurnManager : MonoBehaviour
 
         Debug.Log("[TURN] HandleMoveFinished() called");
 
+        DetectWorldBoxAtCurrentPlayer();
+
+        Debug.Log(
+            $"[PROCESSING STATE] MOVE FINISHED CALLBACK | " +
+            $"Current={current.name} | Processing={isProcessingMove}"
+        );
+
         // Check for automatic same-hex attack first.
         if (TryAutomaticSameHexAttack(current))
         {
+            Debug.Log(
+                $"[PROCESSING STATE] MOVE FINISHED → SAME HEX ATTACK STARTED | " +
+                $"Current={current.name} | Processing={isProcessingMove}"
+            );
+
             return;
         }
 
         isProcessingMove = false;
+
+        Debug.Log(
+            $"[PROCESSING STATE] FALSE — NORMAL MOVE FINISHED | " +
+            $"Current={current.name}"
+        );
+
         StartNextTurn();
     }
 
@@ -601,9 +812,15 @@ public class TurnManager : MonoBehaviour
         {
             Vector3 pos = map.GetVertexPosition(pair.tileName, pair.vertexIndex);
 
+            // AIStation center marker must sit above the center platform.
+            float markerYOffset =
+                (pair.tileName == "AIStation" && pair.vertexIndex == 6)
+                ? 0.35f
+                : 0.05f;
+
             GameObject sphere = Instantiate(
                 map.vertexMarkerPrefab,
-                pos + Vector3.up * 0.05f,
+                pos + Vector3.up * markerYOffset,
                 Quaternion.identity
             );
 
@@ -790,17 +1007,98 @@ public class TurnManager : MonoBehaviour
         Debug.Log($"[ENV] Environmental Damage = {environmentalDamage}");
     }
 
-    void Update()
+    private void ShowDamageText(
+    PlayerUnit target,
+    int shieldLost,
+    int energyLost)
+    {
+        if (damageTextPrefab == null)
+            return;
+
+        if (target == null || target.HitPoint == null)
+            return;
+
+        int totalDamage = shieldLost + energyLost;
+
+        if (totalDamage <= 0)
+            return;
+
+        Vector3 basePosition =
+            target.HitPoint.position + Vector3.up * 0.15f;
+
+        if (Camera.main != null)
+        {
+            Vector3 towardCamera =
+                (Camera.main.transform.position -
+                 target.HitPoint.position).normalized;
+
+            basePosition += towardCamera * 0.35f;
+        }
+
+        FloatingDamageText damageText =
+            Instantiate(
+                damageTextPrefab,
+                basePosition,
+                Quaternion.identity
+            );
+
+        damageText.Show($"-{totalDamage}");
+    }
+
+    private void DetectWorldBoxAtCurrentPlayer()
     {
         if (current == null)
-            return;
-
-        if (isProcessingMove)
-            return;
-
-        if (Input.GetKeyDown(KeyCode.K))
         {
-            ExecuteSelectedAdjacentAttack();
+            Debug.LogWarning("[BOX CHECK] Current player is NULL");
+            return;
         }
+
+        WorldBox[] boxes =
+            FindObjectsByType<WorldBox>(FindObjectsSortMode.None);
+
+        Debug.Log(
+            $"[BOX CHECK] Player={current.name} | " +
+            $"Tile={current.currentTileCoord} | " +
+            $"Vertex={current.currentVertexIndex} | " +
+            $"WorldBoxes found={boxes.Length}"
+        );
+
+        foreach (WorldBox box in boxes)
+        {
+            if (box == null)
+                continue;
+
+            Debug.Log(
+                $"[BOX CHECK] Box={box.name} | " +
+                $"Tile=({box.tileX}, {box.tileY}) | " +
+                $"Vertex={box.vertexIndex} | " +
+                $"World={box.transform.position}"
+            );
+
+            bool sameTile =
+                box.tileX == current.currentTileCoord.x &&
+                box.tileY == current.currentTileCoord.y;
+
+            bool sameVertex =
+                box.vertexIndex == current.currentVertexIndex;
+
+            Debug.Log(
+                $"[BOX CHECK] {box.name} | " +
+                $"SameTile={sameTile} | SameVertex={sameVertex}"
+            );
+
+            if (sameTile && sameVertex)
+            {
+                Debug.Log(
+                    $"<color=lime><b>[BOX DETECTED]</b></color> " +
+                    $"{current.name} found {box.name} at " +
+                    $"tile ({box.tileX}, {box.tileY}) " +
+                    $"vertex {box.vertexIndex}"
+                );
+            }
+        }
+    }
+    private void Update()
+    {
     }
 }

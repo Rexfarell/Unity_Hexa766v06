@@ -9,6 +9,19 @@ public class PlayerAnimationEvents : MonoBehaviour
         playerUnit = GetComponentInParent<PlayerUnit>();
     }
 
+    public void AttackImpact()
+    {
+        if (playerUnit == null)
+        {
+            Debug.LogWarning(
+                "[ATTACK IMPACT] PlayerUnit reference is missing."
+            );
+            return;
+        }
+
+        playerUnit.AttackImpact();
+    }
+
     public void FinishAttack()
     {
         if (playerUnit != null)

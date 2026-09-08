@@ -86,3 +86,99 @@ Notes:
 Scene-specific.
 Should NOT be converted into a prefab.
 Contains no gameplay logic.
+
+# Scene Architecture
+
+## Current high-level structure
+
+The scene currently contains the established map, players, managers, UI, AI Station presentation, and audio systems.
+
+The `Managers` hierarchy is the preferred home for persistent orchestration components.
+
+Known manager-side objects include:
+
+- TurnManager
+- MissionDirector
+- DeliveryPulse
+- MatchMusic
+- Existing delivery feedback/audio controller
+
+## Planned v0.8 manager architecture
+
+```text
+Managers
+├── TurnManager                 [existing]
+├── MissionDirector             [existing]
+├── MatchMusic                  [existing]
+├── DeliveryPulse               [existing]
+├── MatchManager                [planned]
+├── BoxManager                  [planned]
+├── PowerUpManager              [future]
+└── EnemyDirector / DroneHive   [future]
+```
+
+## Responsibility boundaries
+
+### TurnManager
+
+Keeps responsibility for:
+
+- Active player.
+- Turn sequencing.
+- Move processing.
+- Existing combat flow.
+- Movement highlights.
+
+It should not become the owner of the box lifecycle, victory condition, or drone spawning.
+
+### MatchManager — planned
+
+Responsible for:
+
+- Match state.
+- Score-to-win value.
+- Winner.
+- Game-over state.
+- Preventing continuation after the winning delivery.
+- Triggering result presentation.
+
+Avoid freezing the whole game with `Time.timeScale = 0` unless later proven necessary.
+
+### BoxManager — planned
+
+Responsible for:
+
+- Ensuring exactly one box is in circulation.
+- Initial box spawn.
+- Replacement spawn after a successful non-winning delivery.
+- Validating candidate spawn locations.
+- Avoiding duplicate box creation.
+
+It should not replace the already-working PlayerUnit pickup/death-drop behavior.
+
+### PowerUpManager — future
+
+Responsible for:
+
+- Power-up lifecycle.
+- Spawn scenario selection.
+- Preventing duplicate/invalid placement.
+- Coordinating consumable tactical opportunities.
+
+### EnemyDirector / DroneHive — future
+
+Responsible for:
+
+- Drone spawning.
+- Maximum active drone count.
+- Target selection / threat logic.
+- Hive spawn rules.
+- Preventing invalid or unfair spawn locations.
+
+Individual drones should reuse the existing graph/navigation model where practical.
+
+## Architectural constraint
+
+Do not redesign or normalize the established map coordinate, tile, or vertex systems as part of these additions.
+
+New systems should orchestrate the working map rather than replace it.

@@ -72,6 +72,9 @@ public class MissionIntro : MonoBehaviour
     [Header("Audio")]
     public AudioSource introMusic;
 
+    [Header("Match Music")]
+    public AudioSource matchMusic;
+
 
 
     #endregion
@@ -141,6 +144,7 @@ public class MissionIntro : MonoBehaviour
     private Coroutine introCoroutine;
     private bool introSkipped = false;
     private bool waitingForMissionConfirmation = false;
+    private bool missionConfirmed = false;
 
     #endregion
 
@@ -471,21 +475,46 @@ public class MissionIntro : MonoBehaviour
 
     void Update()
     {
-        if (introSkipped || waitingForMissionConfirmation)
+        if (introSkipped)
             return;
 
-        if (Input.GetKeyDown(KeyCode.Return) ||
-            Input.GetKeyDown(KeyCode.KeypadEnter))
+        bool enterPressed =
+            Input.GetKeyDown(KeyCode.Return) ||
+            Input.GetKeyDown(KeyCode.KeypadEnter);
+
+        if (!enterPressed)
+            return;
+
+        // Mission screen is currently asking for confirmation.
+        if (waitingForMissionConfirmation)
         {
-            Debug.Log("[INTRO] Skipped by player.");
+            missionConfirmed = true;
 
-            introSkipped = true;
+            Debug.Log(
+                "[INTRO] Mission confirmed — Enter received."
+            );
 
-            if (introCoroutine != null)
-                StopCoroutine(introCoroutine);
-
-            FinishIntro();
+            return;
         }
+
+        // Enter pressed earlier in the intro = skip intro.
+        Debug.Log(
+            "[INTRO] Skipped by player."
+        );
+
+        introSkipped = true;
+
+        if (introCoroutine != null)
+        {
+            StopCoroutine(introCoroutine);
+            introCoroutine = null;
+        }
+
+        // Remove anything the intro was displaying
+        // at the exact frame the player skipped.
+        HideIntroVisualsImmediately();
+
+        FinishIntro();
     }
 
 
@@ -520,11 +549,63 @@ public class MissionIntro : MonoBehaviour
         StartCoroutine(FinishIntroCleanup());
     }
 
+    private void HideIntroVisualsImmediately()
+    {
+        Debug.Log("[INTRO] Hiding all intro visuals.");
 
+        if (logoPanel != null)
+            logoPanel.SetActive(false);
+
+        if (storyPanel != null)
+            storyPanel.SetActive(false);
+
+        if (missionPanel != null)
+            missionPanel.SetActive(false);
+
+        if (fadePanel != null)
+        {
+            CanvasGroup fadeGroup =
+                fadePanel.GetComponent<CanvasGroup>();
+
+            if (fadeGroup != null)
+                fadeGroup.alpha = 0f;
+
+            fadePanel.SetActive(false);
+        }
+
+        if (storyTitle != null)
+            storyTitle.text = "";
+
+        if (storyBody != null)
+            storyBody.text = "";
+
+        waitingForMissionConfirmation = false;
+        missionConfirmed = true;
+    }
     IEnumerator FinishIntroCleanup()
     {
+        // Fade out the intro soundtrack first.
         if (introMusic != null)
             yield return StartCoroutine(FadeOutMusic(3f));
+
+        // Begin the looping match soundtrack.
+        if (matchMusic != null)
+        {
+            if (!matchMusic.isPlaying)
+            {
+                matchMusic.Play();
+
+                Debug.Log(
+                    "[MATCH MUSIC] Match soundtrack started."
+                );
+            }
+        }
+        else
+        {
+            Debug.LogWarning(
+                "[MATCH MUSIC] MatchMusic AudioSource not assigned."
+            );
+        }
 
         Destroy(this);
     }
@@ -609,6 +690,7 @@ public class MissionIntro : MonoBehaviour
         fadePanel.SetActive(true);
 
         waitingForMissionConfirmation = true;
+        missionConfirmed = false;
 
         mission.alpha = 0f;
         fade.alpha = 0f;
@@ -616,9 +698,12 @@ public class MissionIntro : MonoBehaviour
         yield return Fade(fade, 0f, 0.80f, 0.5f);
         yield return Fade(mission, 0f, 1f, 0.5f);
 
-        while (!Input.GetKeyDown(KeyCode.Return) &&
-               !Input.GetKeyDown(KeyCode.KeypadEnter))
+        while (!missionConfirmed)
             yield return null;
+
+        Debug.Log(
+            "[INTRO] Mission panel confirmation accepted."
+        );
 
         yield return Fade(mission, 1f, 0f, 0.5f);
         yield return Fade(fade, 0.45f, 0f, 0.5f);

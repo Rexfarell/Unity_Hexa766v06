@@ -71,3 +71,55 @@ Serialized references must be assigned after generation.
 Camera markers are scene objects.
 
 They should never become prefabs.
+
+
+# Known Issues and Planned Gaps
+
+## v0.3 design gaps
+
+The following items are intentionally documented as **not implemented yet** at the v0.8 design milestone.
+
+### Single-objective lifecycle
+
+Current box mechanics work, but the new match rule requiring exactly one objective box in circulation still needs a dedicated lifecycle controller.
+
+### Win condition
+
+Delivery scoring works, but first-to-three match termination and winner presentation still need implementation.
+
+### Result screen
+
+Victory/defeat UI and final-match audio presentation are planned but not implemented.
+
+### Spawn fairness
+
+Curated valid box-spawn candidates and path-based reachability validation are planned.
+
+Do not attempt to solve fairness by changing the existing map coordinate or vertex systems.
+
+### Power-ups
+
+Power-up mechanics are planned for a later pass.
+
+Initial candidates:
+
+- Shield.
+- Energy.
+- Attack boost.
+- Movement boost.
+
+Teleportation and disruption remain optional scope.
+
+### Drone hive
+
+Hostile autonomous enemies are planned for the next major gameplay phase after the core match loop.
+
+This future system must be considered when evaluating fairness, because route danger will alter the effective value of box and power-up locations.
+
+## Deferred audio concept
+
+The current audio system is functional and sufficient for the gameplay-completion phase.
+
+A reactive musical system in which gameplay SFX become rhythmically integrated with the match soundtrack is intentionally deferred until the overall game is complete.
+
+Do not prioritize this over core gameplay.

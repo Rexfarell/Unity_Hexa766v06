@@ -79,3 +79,60 @@ Not prefabs:
 - ClickableSphere
 - Procedural Tiles
 - Procedural Vertices
+
+# Prefab Catalog
+
+## Existing objective-related inventory
+
+### WorldBox
+
+Existing gameplay object used for pickup, carrying, death-drop, and delivery.
+
+**v0.3 role:** single contested objective.
+
+The important change is lifecycle ownership rather than a required visual redesign.
+
+### AI Station
+
+Existing delivery destination.
+
+The special delivery-center vertex and current delivery feedback remain part of the core match loop.
+
+## Planned future prefabs
+
+### Power-up pickup
+
+Possible variants:
+
+- Shield Cell.
+- Energy Cell.
+- Attack Boost.
+- Overclock / movement boost.
+- Warp Core / teleport, if implemented.
+
+Recommendation:
+
+Use one shared pickup framework with data/configuration differences rather than unrelated scripts for every power-up.
+
+### Drone
+
+Future hostile unit prefab.
+
+Expected responsibilities may include:
+
+- Drone controller.
+- Visual/animation hierarchy.
+- Damage/health state if required.
+- Graph-navigation reference.
+- Attack effect/audio.
+- Target/threat state.
+
+### Drone Hive / Spawn Node
+
+Potential map-side object used to define legal enemy deployment locations.
+
+## Prefab design rule
+
+New tactical objects should avoid embedding map-coordinate logic directly into visual children.
+
+Logical location should remain compatible with the established tile/vertex graph.

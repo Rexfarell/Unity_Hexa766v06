@@ -11,21 +11,25 @@ public class PlayerClickFeedback : MonoBehaviour
 
     private void OnMouseEnter()
     {
-        // Hover feedback (scale up)
-        transform.localScale = originalScale * 1.2f;
+        // OnMouse events can still arrive while this component is disabled.
+        if (!enabled)
+            return;
 
-        var grid = FindObjectOfType<Map1HexGrid>();
-        if (grid == null || !grid.hasGenerated) return;   // ← THIS LINE PREVENTS EARLY CALL
-
-        if (gameObject == grid.Player1)
-            grid.ShowReachFromPlayer1();
-        else if (gameObject == grid.Player2)
-            grid.ShowReachFromPlayer2();
+        transform.localScale = originalScale * 2.4f;
     }
 
     private void OnMouseExit()
     {
-        // Return to original scale
+        if (!enabled)
+            return;
+
+        transform.localScale = originalScale;
+    }
+
+    private void OnDisable()
+    {
+        // Prevent the player remaining enlarged if feedback
+        // gets disabled while the mouse is over it.
         transform.localScale = originalScale;
     }
 

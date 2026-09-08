@@ -11,7 +11,8 @@ public class PlayerUnit : MonoBehaviour
     public int teamID;               // 1 = Player1, 2 = Player2
     public int energy = 100;
     public int shield = 100;  // ← depletes before energy
-    
+
+    public bool IsDead => isDead;
     public Vector2Int currentTileCoord;
     public int currentVertexIndex = 0;
 
@@ -30,6 +31,8 @@ public class PlayerUnit : MonoBehaviour
     private string spawnTileName;
     private int spawnVertexIndex;
     private bool isDead = false;
+
+    
     public float respawnDelay = 3f;
 
     private bool turnAlreadyFinished = false;
@@ -38,10 +41,71 @@ public class PlayerUnit : MonoBehaviour
     [SerializeField] private GameObject carriedBox; // robot internal box
     [SerializeField] private float moveSpeed = 3f;
     private bool isCarryingBox = false;
+    private WorldBox carriedWorldBox;
     [Header("Health Bars")]
     [SerializeField] private Transform shieldBar;
     [SerializeField] private Transform energyBar;
-    
+    [Header("ATTACK AUDIO")]
+    [SerializeField] private AudioSource attackAudioSource;
+    [SerializeField] private AudioClip attackImpactClip;
+
+    [Header("PICKUP AUDIO")]
+    [SerializeField]
+    private AudioSource pickupAudioSource;
+
+    [SerializeField]
+    private AudioClip pickupClip;
+
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float pickupVolume = 1f;
+
+    [Header("ATTACK EFFECT POINTS")]
+    [SerializeField] private Transform attackOrigin;
+    [SerializeField] private Transform hitPoint;
+
+    [Header("AI STATION VISUAL")]
+    [SerializeField]
+    private Transform visualRoot;
+
+    [SerializeField]
+    private float normalVisualLocalY = -0.5f;
+
+    [Header("DELIVERY CAMERA")]
+    [SerializeField]
+    private CameraFollow cameraFollow;
+
+    [SerializeField]
+    private float deliveryCameraLeadIn = 0.35f;
+
+    [SerializeField]
+    private float deliveryAnimationDuration = 0.7f;
+
+    [SerializeField]
+    private float aiStationVisualLift = 0.12f;
+
+    private bool isDeliveringBox = false;
+
+    private Vector3 normalVisualLocalPosition;
+
+    public Transform AttackOrigin => attackOrigin;
+    public Transform HitPoint => hitPoint;
+
+    [Header("AI STATION FEEDBACK")]
+    [SerializeField]
+    private AIStationFeedback aiStationFeedback;
+
+    [Header("DEATH AUDIO")]
+    [SerializeField]
+    private AudioSource deathAudioSource;
+
+    [SerializeField]
+    private AudioClip deathClip;
+
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float deathVolume = 1f;
+
     void Start()
     {
         map = FindObjectOfType<Map1HexGrid>();
@@ -51,6 +115,12 @@ public class PlayerUnit : MonoBehaviour
         {
             Debug.LogError($"[{name}] Map1HexGrid missing!");
             return;
+        }
+
+        if (aiStationFeedback == null)
+        {
+            aiStationFeedback =
+                FindFirstObjectByType<AIStationFeedback>();
         }
 
         //  REGISTER THIS UNIT WITH THE TURN MANAGER
@@ -89,7 +159,43 @@ public class PlayerUnit : MonoBehaviour
             energyBarFullWidth = energyBar.localScale.x;
         }
 
+        if (carriedBox != null)
+        {
+            Debug.Log(
+                $"[CARRIED BOX TEST] {name} reference = {carriedBox.name}",
+                carriedBox
+            );
+
+            carriedBox.SetActive(false);
+        }
+        else
+        {
+            Debug.LogWarning(
+                $"[CARRIED BOX TEST] {name} has NO carriedBox assigned."
+            );
+        }
+
         UpdateHealthBars();
+
+        if (cameraFollow == null)
+        {
+            cameraFollow =
+                FindFirstObjectByType<CameraFollow>();
+
+            if (cameraFollow != null)
+            {
+                Debug.Log(
+                    $"[CAMERA SETUP] {name} found CameraFollow on " +
+                    $"{cameraFollow.gameObject.name}"
+                );
+            }
+            else
+            {
+                Debug.LogError(
+                    $"[CAMERA SETUP] {name} could not find CameraFollow."
+                );
+            }
+        }
     }
 
 
@@ -149,6 +255,19 @@ public class PlayerUnit : MonoBehaviour
         isMoving = true;
         turnAlreadyFinished = false;
 
+        // Always return to normal visual height before movement begins.
+        if (visualRoot != null)
+        {
+            normalVisualLocalPosition =
+                visualRoot.localPosition;
+
+            normalVisualLocalPosition.y =
+                normalVisualLocalY;
+
+            visualRoot.localPosition =
+                normalVisualLocalPosition;
+        }
+
         // Start walking animation
         if (animator != null)
             animator.SetBool("Walking", true);
@@ -173,53 +292,132 @@ public class PlayerUnit : MonoBehaviour
             // Update logical position as each vertex is reached.
             currentTileCoord = map.GetTileGridCoord(step.tileName);
             currentVertexIndex = step.vertexIndex;
-
-            
         }
+
         Debug.Log(
             $"[MOVE OCCUPANCY FINAL] {name} FINAL = " +
             $"{currentTileCoord} v{currentVertexIndex}"
-            );
+        );
+
         isMoving = false;
 
         // Stop walking animation
         if (animator != null)
             animator.SetBool("Walking", false);
 
+        if (visualRoot != null)
+        {
+            // Always restore the robot's normal visual position first.
+            visualRoot.localPosition = normalVisualLocalPosition;
+
+            // AIStation v6 = raised center platform.
+            // Apply lift in WORLD space so parent scale does not shrink it.
+            if (currentVertexIndex == 6)
+            {
+                visualRoot.position +=
+                    Vector3.up * aiStationVisualLift;
+            }
+        }
         // If the unit died during the move, do not attempt pickup.
         // The death routine has already started the respawn countdown.
         if (isDead)
         {
-            Debug.Log($"[{name}] SmoothMove finished, but unit is dead. DieRoutine will handle the turn.");
+            Debug.Log(
+                $"[{name}] SmoothMove finished, but unit is dead. " +
+                $"DieRoutine will handle the turn."
+            );
 
-            // Do NOT end the turn here.
-            // DieRoutine controls the death-animation delay.
+            yield break;
+        }
+
+        // -------------------------------------------------
+        // AI STATION DELIVERY
+        // AIStation vertex 6 = center delivery platform
+        // -------------------------------------------------
+        // -------------------------------------------------
+        // AI STATION DELIVERY
+        // Resolve where the player ACTUALLY ended up.
+        // -------------------------------------------------
+        var resolvedLocation = map.GetPlayerTileAndVertex(gameObject);
+
+        Debug.Log(
+            $"[DELIVERY CHECK] {name} | " +
+            $"Tile={resolvedLocation.tileName} | " +
+            $"Vertex={resolvedLocation.vertexIndex} | " +
+            $"Carrying={isCarryingBox}"
+        );
+
+        if (isCarryingBox &&
+            !isDeliveringBox &&
+            resolvedLocation.tileName == "AIStation" &&
+            resolvedLocation.vertexIndex == 6)
+        {
+            Debug.Log(
+                $"### DELIVERY CALL SITE ### {name} is calling DeliverBoxAtAIStation NOW."
+);
+
+            DeliverBoxAtAIStation();
+
             yield break;
         }
 
         // Normal movement: continue with the existing pickup logic.
-        TryPickupBox();
+        bool startedPickup = TryPickupBox();
 
-        if (!isCarryingBox)
+        if (startedPickup)
         {
-            turnAlreadyFinished = true;
+            Debug.Log(
+                $"[PICKUP FLOW] {name} pickup started. " +
+                $"PickupSequence will end the turn."
+            );
 
-            if (turnManager != null)
-                turnManager.HandleMoveFinished();
+            yield break;
         }
+
+        Debug.Log(
+            $"[PICKUP FLOW] {name} no pickup. Ending turn normally."
+        );
+
+        turnAlreadyFinished = true;
+
+        if (turnManager != null)
+            turnManager.HandleMoveFinished();
     }
 
 
-    void TryPickupBox()
+    private bool TryPickupBox()
     {
-        if (isCarryingBox) return;
+        if (isCarryingBox)
+            return false;
 
-        WorldBox box = FindBoxOnMyVertex();
-        if (box == null) return;
+        WorldBox[] boxes =
+            FindObjectsByType<WorldBox>(FindObjectsSortMode.None);
 
-        StartCoroutine(PickupSequence(box));
+        foreach (WorldBox box in boxes)
+        {
+            if (box == null)
+                continue;
+
+            bool sameTile =
+                box.tileX == currentTileCoord.x &&
+                box.tileY == currentTileCoord.y;
+
+            bool sameVertex =
+                box.vertexIndex == currentVertexIndex;
+
+            if (sameTile && sameVertex)
+            {
+                Debug.Log($"[PICKUP] Found {box.name}");
+
+                StartCoroutine(PickupSequence(box));
+
+                return true;
+            }
+        }
+
+        return false;
     }
-    
+
     void DebugBoxesOnMyTile()
     {
         Debug.Log($"[DEBUG OWNER] {name}", this);
@@ -281,63 +479,143 @@ public class PlayerUnit : MonoBehaviour
     IEnumerator PickupSequence(WorldBox box)
     {
         Debug.Log($"[PICKUP] Picking up {box.name}", this);
-        
-
-        Debug.Log("[PICKUP] Triggering BoxUp", animator);
 
         if (animator != null)
         {
             animator.enabled = true;
 
-            // HARD RESET — fixes Player2 desync
+            // Keep this because it previously fixed Player2 desync
             animator.Rebind();
             animator.Update(0f);
 
-            Debug.Log($"[BOXUP] Trigger fired by {name} at frame {Time.frameCount}");
-            animator.ResetTrigger("BoxDown");
-            animator.ResetTrigger("BoxUp");
-            animator.SetTrigger("BoxUp");
-        }
+            animator.SetBool("BoxDown", false);
+            animator.SetBool("BoxUp", true);
 
+            // Play pickup sound at the same moment
+            // the BoxUp animation begins.
+            if (pickupAudioSource != null &&
+                pickupClip != null)
+            {
+                pickupAudioSource.PlayOneShot(
+                    pickupClip,
+                    pickupVolume
+                );
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"[PICKUP AUDIO] {name} pickup audio not assigned."
+                );
+            }
+        }
         else
         {
             Debug.LogError($"[PICKUP] No Animator found for {name}");
         }
 
-        yield return new WaitForSeconds(0.8f);
-
+        carriedWorldBox = box;
+        // Remove world box
         box.gameObject.SetActive(false);
 
+        // Show internal carried box
         if (carriedBox != null)
+        {
             carriedBox.SetActive(true);
+
+            Renderer carriedRenderer =
+                carriedBox.GetComponentInChildren<Renderer>(true);
+
+            Debug.Log(
+                $"[CARRIED BOX A] IMMEDIATELY | " +
+                $"activeSelf={carriedBox.activeSelf} | " +
+                $"activeInHierarchy={carriedBox.activeInHierarchy} | " +
+                $"RendererEnabled={(carriedRenderer != null ? carriedRenderer.enabled : false)}"
+            );
+        }
 
         isCarryingBox = true;
 
-        // PICKUP CONSUMES THE TURN
- 
+        // Wait exactly one frame
+        yield return null;
+
+        if (carriedBox != null)
+        {
+            Renderer carriedRenderer =
+                carriedBox.GetComponentInChildren<Renderer>(true);
+
+            Debug.Log(
+                $"[CARRIED BOX B] AFTER 1 FRAME | " +
+                $"activeSelf={carriedBox.activeSelf} | " +
+                $"activeInHierarchy={carriedBox.activeInHierarchy} | " +
+                $"RendererEnabled={(carriedRenderer != null ? carriedRenderer.enabled : false)}"
+            );
+        }
+
+        // Wait a little longer
+        yield return new WaitForSeconds(0.1f);
+
+        if (carriedBox != null)
+        {
+            Renderer carriedRenderer =
+                carriedBox.GetComponentInChildren<Renderer>(true);
+
+            Debug.Log(
+                $"[CARRIED BOX C] AFTER 0.1 SEC | " +
+                $"activeSelf={carriedBox.activeSelf} | " +
+                $"activeInHierarchy={carriedBox.activeInHierarchy} | " +
+                $"RendererEnabled={(carriedRenderer != null ? carriedRenderer.enabled : false)}"
+            );
+        }
+
+        // Finish approximately the original 0.8-second delay
+        yield return new WaitForSeconds(0.7f);
+
+        if (animator != null)
+            animator.SetBool("BoxUp", false);
+
+        if (carriedBox != null)
+        {
+            Renderer carriedRenderer =
+                carriedBox.GetComponentInChildren<Renderer>(true);
+
+            Debug.Log(
+                $"[CARRIED BOX D] BEFORE TURN CHANGE | " +
+                $"activeSelf={carriedBox.activeSelf} | " +
+                $"activeInHierarchy={carriedBox.activeInHierarchy} | " +
+                $"RendererEnabled={(carriedRenderer != null ? carriedRenderer.enabled : false)}"
+            );
+        }
 
         if (turnManager != null)
         {
             Debug.Log("[PICKUP] Pickup complete. Ending turn.");
+
             turnManager.HandleMoveFinished();
+
+            if (carriedBox != null)
+            {
+                Renderer carriedRenderer =
+                    carriedBox.GetComponentInChildren<Renderer>(true);
+
+                Debug.Log(
+                    $"[CARRIED BOX E] AFTER TURN CHANGE | " +
+                    $"activeSelf={carriedBox.activeSelf} | " +
+                    $"activeInHierarchy={carriedBox.activeInHierarchy} | " +
+                    $"RendererEnabled={(carriedRenderer != null ? carriedRenderer.enabled : false)}"
+                );
+            }
         }
     }
 
 
-    
-
     IEnumerator DropBoxFinalize()
     {
-        yield return new WaitForSeconds(0.7f); // match animation length
+        yield return new WaitForSeconds(0.7f);
 
-        if (carriedBox != null)
-            carriedBox.SetActive(false);
+        if (animator != null)
+            animator.SetBool("BoxDown", false);
 
-        isCarryingBox = false;
-
-        Debug.Log($"[BOXDOWN] {name} finished drop");
-
-        onActionResolved?.Invoke();
+        Debug.Log($"[BOXDOWN] {name} animation finished");
     }
     void Update()
     {
@@ -355,37 +633,94 @@ public class PlayerUnit : MonoBehaviour
 
     void DropBox()
     {
-        if (!isCarryingBox) return;
+        if (!isCarryingBox)
+            return;
 
-        Animator animator = GetComponentInChildren<Animator>(true);
         if (animator != null)
         {
-            animator.ResetTrigger("BoxUp");
-            animator.SetTrigger("BoxDown");
+            animator.SetBool("BoxUp", false);
+            animator.SetBool("BoxDown", true);
         }
 
-        // Spawn new world box at current vertex
-        WorldBox newBox = Instantiate(
-            FindObjectOfType<WorldBox>(),
-            transform.position,
-            Quaternion.identity
-        );
+        if (carriedWorldBox != null)
+        {
+            carriedWorldBox.transform.position = transform.position;
 
-        newBox.tileX = currentTileCoord.x;
-        newBox.tileY = currentTileCoord.y;
-        newBox.vertexIndex = currentVertexIndex;
+            carriedWorldBox.tileX = currentTileCoord.x;
+            carriedWorldBox.tileY = currentTileCoord.y;
+            carriedWorldBox.vertexIndex = currentVertexIndex;
+            carriedWorldBox.WorldVertexPosition = transform.position;
 
-        // Team color
-        Renderer r = newBox.GetComponentInChildren<Renderer>();
-        if (r != null)
-            r.material.color = teamID == 1 ? Color.blue : Color.red;
+            carriedWorldBox.gameObject.SetActive(true);
+        }
 
         if (carriedBox != null)
             carriedBox.SetActive(false);
 
+        carriedWorldBox = null;
         isCarryingBox = false;
 
         Debug.Log($"[BOXDOWN] {name} dropped box");
+        StartCoroutine(DropBoxFinalize());
+    }
+
+    private void DropCarriedBoxOnDeath()
+    {
+        if (!isCarryingBox)
+            return;
+
+        Debug.Log(
+            $"[DEATH BOX] {name} died while carrying a box. " +
+            $"Dropping it at {currentTileCoord} v{currentVertexIndex}."
+        );
+
+        // Stop any carry/drop animation state.
+        if (animator != null)
+        {
+            animator.SetBool("BoxUp", false);
+            animator.SetBool("BoxDown", false);
+        }
+
+        // Return the ORIGINAL WorldBox to the map
+        // at the exact vertex where the player died.
+        if (carriedWorldBox != null)
+        {
+            carriedWorldBox.transform.position =
+                transform.position;
+
+            carriedWorldBox.tileX =
+                currentTileCoord.x;
+
+            carriedWorldBox.tileY =
+                currentTileCoord.y;
+
+            carriedWorldBox.vertexIndex =
+                currentVertexIndex;
+
+            carriedWorldBox.WorldVertexPosition =
+                transform.position;
+
+            carriedWorldBox.gameObject.SetActive(true);
+
+            Debug.Log(
+                $"[DEATH BOX] {carriedWorldBox.name} restored to world."
+            );
+        }
+        else
+        {
+            Debug.LogWarning(
+                $"[DEATH BOX] {name} says it is carrying a box, " +
+                $"but carriedWorldBox is NULL."
+            );
+        }
+
+        // Hide the robot's internal carried-box visual.
+        if (carriedBox != null)
+            carriedBox.SetActive(false);
+
+        // Player no longer owns the box.
+        carriedWorldBox = null;
+        isCarryingBox = false;
     }
 
     public void Die()
@@ -393,14 +728,18 @@ public class PlayerUnit : MonoBehaviour
         if (isDead)
             return;
 
+        // If carrying a box, leave it at the death vertex.
+        DropCarriedBoxOnDeath();
+
         isDead = true;
         isMoving = false;
 
-        Debug.Log($"[{name}] Unit destroyed.");
+        Debug.Log(
+            $"[{name}] Unit destroyed."
+        );
 
         StartCoroutine(DieRoutine());
     }
-
     private IEnumerator DieRoutine()
     {
         Debug.Log($"[{name}] DieRoutine STARTED");
@@ -410,6 +749,29 @@ public class PlayerUnit : MonoBehaviour
             animator.SetBool("Walking", false);
             animator.SetTrigger("Die");
         }
+
+        // Death audio
+        if (deathAudioSource != null &&
+            deathClip != null)
+        {
+            deathAudioSource.PlayOneShot(
+                deathClip,
+                deathVolume
+            );
+        }
+        else
+        {
+            Debug.LogWarning(
+                $"[DEATH AUDIO] {name} death audio not assigned."
+            );
+        }
+
+        // Start the respawn countdown independently.
+        StartCoroutine(RespawnRoutine());
+
+        // Give the death animation time to play.
+        yield return new WaitForSeconds(5.0f);
+
 
         // Start the respawn countdown independently.
         StartCoroutine(RespawnRoutine());
@@ -445,14 +807,62 @@ public class PlayerUnit : MonoBehaviour
         shield = 100;
 
         // Refresh UI
+
+        if (carriedBox != null)
+        {
+            carriedBox.SetActive(false);
+            Debug.Log($"[CARRIED BOX] {name} starting with carried box hidden.");
+        }
+        else
+        {
+            Debug.LogWarning($"[CARRIED BOX] {name} has no Carried Box assigned.");
+        }
+
+        UpdateHealthBars();
         UpdateHealthBars();
 
         Debug.Log($"[RESPAWN] Energy={energy} Shield={shield}");
+
+        // -------------------------------------------------
+        // POSITION BEFORE MAP RESPAWN
+        // -------------------------------------------------
+        Debug.Log(
+            $"[RESPAWN DEBUG] {name} BEFORE map.RespawnPlayer " +
+            $"World={transform.position} " +
+            $"StoredTile={currentTileCoord} " +
+            $"StoredVertex={currentVertexIndex}"
+        );
 
         // Ask the map to respawn this player
         if (map != null)
         {
             map.RespawnPlayer(this);
+
+            // -------------------------------------------------
+            // POSITION AFTER MAP RESPAWN
+            // -------------------------------------------------
+            Debug.Log(
+                $"[RESPAWN DEBUG] {name} AFTER map.RespawnPlayer " +
+                $"World={transform.position} " +
+                $"StoredTile={currentTileCoord} " +
+                $"StoredVertex={currentVertexIndex}"
+            );
+
+            // Ask the map which actual graph vertex it thinks
+            // the respawned player occupies.
+            var resolvedLocation =
+                map.GetPlayerTileAndVertex(gameObject);
+
+            Debug.Log(
+                $"[RESPAWN DEBUG] {name} MAP RESOLVED = " +
+                $"{resolvedLocation.tileName} v{resolvedLocation.vertexIndex}"
+            );
+        }
+        else
+        {
+            Debug.LogError(
+                $"[RESPAWN DEBUG] {name}: map reference is NULL!"
+            );
         }
 
         // Reset animator
@@ -463,17 +873,21 @@ public class PlayerUnit : MonoBehaviour
         }
 
         isDead = false;
-        Debug.Log($"[RESPAWN END] {name} final position = {transform.position}");
+
+        Debug.Log(
+            $"[RESPAWN END] {name} final position = {transform.position}"
+        );
+
         Debug.Log($"[{name}] Respawned.");
     }
 
-    public void TakeAttackDamage(int amount)
+    public (int shieldLost, int energyLost) TakeAttackDamage(int amount)
     {
         if (amount <= 0)
-            return;
+            return (0, 0);
 
         if (isDead)
-            return;
+            return (0, 0);
 
         int shieldLost = 0;
         int energyLost = 0;
@@ -512,6 +926,8 @@ public class PlayerUnit : MonoBehaviour
 
             Die();
         }
+
+        return (shieldLost, energyLost);
     }
 
     public void TakeEnvironmentalDamage(int amount)
@@ -600,6 +1016,22 @@ public class PlayerUnit : MonoBehaviour
         }
     }
 
+    private void OnDisable()
+    {
+        Debug.LogError(
+            $"### PLAYERUNIT DISABLED ### {name} | " +
+            $"ActiveSelf={gameObject.activeSelf} | " +
+            $"ActiveInHierarchy={gameObject.activeInHierarchy}"
+        );
+    }
+
+    private void OnDestroy()
+    {
+        Debug.LogError(
+            $"### PLAYERUNIT DESTROYED ### {name}"
+        );
+    }
+
     public void Attack()
     {
         if (isDead || isMoving)
@@ -609,22 +1041,254 @@ public class PlayerUnit : MonoBehaviour
 
         if (animator != null)
         {
+            Debug.Log(
+                $"[ATTACK ANIM] Animator found on {animator.gameObject.name}"
+            );
+
             animator.SetBool("Attack", true);
+
+            Debug.Log(
+                $"[ATTACK ANIM] Attack bool = {animator.GetBool("Attack")}"
+            );
+        }
+        else
+        {
+            Debug.LogError(
+                $"[ATTACK ANIM] {name} has NO Animator reference!"
+            );
         }
     }
+    
+    public void AttackImpact()
+    {
+        Debug.Log($"[ATTACK IMPACT] {name} impact frame reached.");
 
+        if (attackAudioSource != null && attackImpactClip != null)
+        {
+            attackAudioSource.PlayOneShot(attackImpactClip);
+        }
+
+        if (turnManager != null)
+            turnManager.HandleAttackImpact();
+    }
     public void FinishAttack()
     {
         if (animator != null)
         {
+            Debug.Log(
+                $"[ATTACK ANIM] FinishAttack reached on {name}"
+            );
+
             animator.SetBool("Attack", false);
         }
 
         Debug.Log($"[ATTACK] {name} attack animation finished.");
 
         if (turnManager != null)
-        {
             turnManager.HandleAttackFinished();
+    }
+
+    private void DeliverBoxAtAIStation()
+    {
+        if (isDeliveringBox)
+            return;
+
+        isDeliveringBox = true;
+        isMoving = false;
+
+        Debug.Log(
+            $"[DELIVERY] {name} reached AIStation v6 with a box."
+        );
+
+        // Start delivery camera.
+        if (cameraFollow == null)
+        {
+            cameraFollow =
+                FindFirstObjectByType<CameraFollow>();
+        }
+
+        if (cameraFollow != null)
+        {
+            Debug.Log(
+                $"[CAMERA DELIVERY] {name} starting delivery focus."
+            );
+
+            cameraFollow.BeginDeliveryFocus(
+                transform
+            );
+        }
+        else
+        {
+            Debug.LogError(
+                $"[CAMERA DELIVERY] {name} CameraFollow not found."
+            );
+        }
+
+        // IMPORTANT:
+        // Start BoxDown directly instead of waiting through Invoke.
+        StartAIStationBoxDown();
+    }
+
+    private void StartAIStationBoxDown()
+    {
+        Debug.Log(
+            $"[DELIVERY] {name} StartAIStationBoxDown reached."
+        );
+
+        if (animator != null)
+        {
+            animator.SetBool(
+                "BoxUp",
+                false
+            );
+
+            animator.SetBool(
+                "BoxDown",
+                true
+            );
+
+            Debug.Log(
+                $"[DELIVERY] {name} BoxDown started."
+            );
+        }
+        else
+        {
+            Debug.LogError(
+                $"[DELIVERY] {name} Animator is NULL."
+            );
+        }
+        if (cameraFollow != null)
+        {
+            cameraFollow.ScheduleDeliveryFinish(
+                this,
+                deliveryAnimationDuration
+            );
+        }
+        else
+        {
+            Debug.LogError(
+                $"[DELIVERY] {name} cannot schedule finish because CameraFollow is NULL."
+            );
+        }
+    }
+
+    public void CompleteAIStationDelivery()
+    {
+        Debug.Log(
+            $"[DELIVERY] {name} completion requested by CameraFollow."
+        );
+
+        StartCoroutine(
+            FinishAIStationDeliveryRoutine()
+        );
+    }
+    private IEnumerator FinishAIStationDeliveryRoutine()
+    {
+        Debug.Log(
+            $"[DELIVERY] {name} FinishAIStationDeliveryRoutine reached."
+        );
+
+        // Finish BoxDown state.
+        if (animator != null)
+        {
+            animator.SetBool(
+                "BoxDown",
+                false
+            );
+        }
+
+        // Hide robot's internal carried box.
+        if (carriedBox != null)
+        {
+            carriedBox.SetActive(false);
+        }
+
+        // Delivered WorldBox is permanently consumed.
+        if (carriedWorldBox != null)
+        {
+            Destroy(
+                carriedWorldBox.gameObject
+            );
+
+            carriedWorldBox = null;
+        }
+
+        isCarryingBox = false;
+
+        // -----------------------------------------
+        // DELIVERY VISUAL FEEDBACK
+        // -----------------------------------------
+        // Make sure we have the actual visible station feedback component.
+        if (aiStationFeedback == null)
+        {
+            aiStationFeedback =
+                FindFirstObjectByType<AIStationFeedback>();
+        }
+
+        Debug.Log(
+            $"[DELIVERY FEEDBACK TEST] {name} | " +
+            $"Reference = " +
+            $"{(aiStationFeedback != null ? aiStationFeedback.gameObject.name : "NULL")}"
+        );
+
+        if (aiStationFeedback != null)
+        {
+            aiStationFeedback.PlayDeliveryFlash();
+        }
+
+        // Score + popup.
+        if (ScoreUI.Instance != null)
+        {
+            ScoreUI.Instance.AddScore(
+                teamID,
+                1
+            );
+
+            Debug.Log(
+                $"[SCORE] {name} awarded Team {teamID} +1."
+            );
+        }
+        else
+        {
+            Debug.LogError(
+                "[SCORE ERROR] ScoreUI.Instance is NULL."
+            );
+        }
+
+        // IMPORTANT:
+        // Keep the delivery camera on the station/player
+        // while the pulse and score feedback are visible.
+        yield return new WaitForSecondsRealtime(1.0f);
+
+        // Restore camera AFTER feedback has been shown.
+        if (cameraFollow != null)
+        {
+            Debug.Log(
+                $"[CAMERA DELIVERY] {name} restoring normal camera."
+            );
+
+            cameraFollow.EndDeliveryFocus();
+        }
+        else
+        {
+            Debug.LogError(
+                $"[CAMERA DELIVERY] {name} cannot restore camera — cameraFollow is NULL."
+            );
+        }
+
+        isDeliveringBox = false;
+        turnAlreadyFinished = true;
+
+        // Only now allow the next player's turn.
+        if (turnManager != null)
+        {
+            turnManager.HandleMoveFinished();
+        }
+        else
+        {
+            Debug.LogError(
+                $"[DELIVERY] {name} TurnManager is NULL."
+            );
         }
     }
 }

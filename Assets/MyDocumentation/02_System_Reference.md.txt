@@ -282,3 +282,158 @@ Whenever a system receives:
 - a major refactor;
 
 this document must be updated during the same work session.
+
+# System Reference
+
+## Existing stable systems
+
+### Map1HexGrid
+
+Provides the established hex/vertex graph and pathfinding model.
+
+Important constraint:
+
+> The existing coordinate system, tile naming, vertex mapping, and AI Station special center vertex are intentional and must not be normalized or redesigned during v0.8 work.
+
+### PlayerUnit
+
+Currently owns player-level behavior including:
+
+- Movement.
+- Animation state.
+- Combat animation hooks.
+- Shield and energy.
+- Death and respawn.
+- Box pickup.
+- Carried box state.
+- Box drop on death.
+- AI Station delivery sequence.
+- Pickup/death audio hooks.
+
+The v0.8 systems should call into or receive events from PlayerUnit instead of relocating all gameplay state into it.
+
+### TurnManager
+
+Currently owns turn sequencing, movement highlighting, occupancy checks, and attack resolution.
+
+### ScoreUI
+
+Currently provides delivery scoring and score presentation.
+
+v0.8 should reuse the existing score flow, adding a match-level victory check after a successful score increment.
+
+### AIStationFeedback
+
+Provides delivery visual feedback and synchronized delivery audio.
+
+### CameraFollow
+
+Provides normal player following and delivery focus behavior.
+
+### MissionIntro / MatchMusic
+
+The intro owns the transition from intro presentation into the match. Match music is a separate looping AudioSource.
+
+## Planned systems
+
+### BoxManager
+
+**Status:** planned for v0.8.
+
+Primary invariant:
+
+> At most one objective box may exist in circulation.
+
+Responsibilities:
+
+- Spawn the first box.
+- Hold the current objective reference.
+- Spawn a replacement after delivery.
+- Do not spawn after the winning delivery.
+- Select only valid candidate locations.
+
+### MatchManager
+
+**Status:** planned for v0.8.
+
+Suggested responsibilities:
+
+```text
+scoreToWin = 3
+matchEnded
+winnerTeam
+CheckVictory()
+EndMatch()
+RestartMatch()
+```
+
+The first implementation should be intentionally small.
+
+### Spawn scenario system
+
+**Status:** later v0.8 / post-core loop.
+
+Initial recommendation:
+
+Use curated legal spawn candidates rather than unrestricted procedural placement.
+
+Candidates may later be grouped into tactical scenarios containing:
+
+- Box position.
+- Power-up position.
+- Relative advantage.
+- Route danger.
+- Drone pressure.
+
+The system should validate reachability using existing pathfinding before accepting a candidate.
+
+### Power-up system
+
+**Status:** future.
+
+Initial low-risk effects:
+
+- Restore shield.
+- Restore energy.
+- Boost next attack.
+- Temporary movement bonus.
+
+Advanced optional effect:
+
+- Restricted teleportation to highlighted legal graph destinations.
+
+### EnemyDirector / DroneHive
+
+**Status:** future next phase.
+
+Responsibilities:
+
+- Deploy active enemies.
+- Maintain a maximum drone population.
+- Provide neutral environmental pressure.
+- Increase tactical pressure around carriers and routes.
+- Avoid hard-locking the AI Station.
+
+The carrier may have increased threat/aggro, but drones should not be a hidden rubber-band system that automatically punishes the leader.
+
+## Fairness model
+
+Do not evaluate fairness only as:
+
+```text
+distance(Player1, Box) ≈ distance(Player2, Box)
+```
+
+Instead, future tactical evaluation should consider effective opportunity:
+
+```text
+Objective access
++ nearby power-up value
++ route safety / danger
++ current health and shield
++ interception potential
++ current score context
++ drone pressure
+```
+
+This is a design model, not yet a required numeric formula.
