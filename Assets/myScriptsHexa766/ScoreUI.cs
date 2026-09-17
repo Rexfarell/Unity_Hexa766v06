@@ -14,9 +14,19 @@ public class ScoreUI : MonoBehaviour
     [SerializeField] private CanvasGroup deliveryBannerGroup;
     [SerializeField] private float bannerDuration = 1.5f;
 
+    [Header("VICTORY PANEL")]
+    [SerializeField] private TMP_Text victoryText;
+    [SerializeField] private CanvasGroup victoryPanelGroup;
+
     private int player1Score = 0;
     private int player2Score = 0;
 
+    [Header("WIN CONDITION")]
+    [SerializeField] private int scoreToWin = 3;
+
+    public int ScoreToWin => scoreToWin;
+    public int Player1Score => player1Score;
+    public int Player2Score => player2Score;
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -38,17 +48,27 @@ public class ScoreUI : MonoBehaviour
             deliveryBannerGroup.interactable = false;
             deliveryBannerGroup.blocksRaycasts = false;
         }
+
+        if (victoryPanelGroup != null)
+        {
+            victoryPanelGroup.alpha = 0f;
+            victoryPanelGroup.interactable = false;
+            victoryPanelGroup.blocksRaycasts = false;
+        }
     }
 
-    public void AddScore(int teamID, int amount)
+    public bool AddScore(int teamID, int amount)
     {
         Debug.Log(
             $"[SCORE UI] AddScore received | Team={teamID} | Amount={amount}"
         );
 
+        int updatedScore;
+
         if (teamID == 1)
         {
             player1Score += amount;
+            updatedScore = player1Score;
 
             Debug.Log(
                 $"[SCORE UI] Player1 score = {player1Score}"
@@ -57,6 +77,7 @@ public class ScoreUI : MonoBehaviour
         else if (teamID == 2)
         {
             player2Score += amount;
+            updatedScore = player2Score;
 
             Debug.Log(
                 $"[SCORE UI] Player2 score = {player2Score}"
@@ -68,11 +89,24 @@ public class ScoreUI : MonoBehaviour
                 $"[SCORE UI] INVALID TEAM ID = {teamID}"
             );
 
-            return;
+            return false;
         }
 
         RefreshScoreUI();
         ShowDeliveryBanner(teamID, amount);
+
+        bool wonMatch =
+            updatedScore >= scoreToWin;
+
+        if (wonMatch)
+        {
+            Debug.Log(
+                $"[MATCH WIN] Player {teamID} reached " +
+                $"{updatedScore}/{scoreToWin} deliveries."
+            );
+        }
+
+        return wonMatch;
     }
 
     private void RefreshScoreUI()
@@ -85,7 +119,7 @@ public class ScoreUI : MonoBehaviour
         if (player1ScoreText != null)
         {
             player1ScoreText.text =
-                $"P1 Delivered: {player1Score}";
+                $"Blue: {player1Score}";
 
             player1ScoreText.ForceMeshUpdate();
         }
@@ -99,7 +133,7 @@ public class ScoreUI : MonoBehaviour
         if (player2ScoreText != null)
         {
             player2ScoreText.text =
-                $"P2 Delivered: {player2Score}";
+                $"Red: {player2Score}";
 
             player2ScoreText.ForceMeshUpdate();
         }
@@ -113,8 +147,11 @@ public class ScoreUI : MonoBehaviour
 
     private void ShowDeliveryBanner(int teamID, int amount)
     {
+        string teamName =
+     teamID == 1 ? "BLUE" : "RED";
+
         string msg =
-            $"PLAYER {teamID} DELIVERED A BOX!\n+{amount}";
+            $"{teamName} DELIVERED\n+{amount}";
 
         Debug.Log(
             $"[DELIVERY BANNER] Showing: {msg}"
@@ -158,5 +195,43 @@ public class ScoreUI : MonoBehaviour
         Debug.Log(
             "[DELIVERY BANNER] Hidden."
         );
+    }
+
+    public void ShowVictory(int teamID)
+    {
+        Debug.Log(
+            $"[VICTORY UI] Showing victory for Player {teamID}."
+        );
+
+        if (victoryText != null)
+        {
+            string teamName =
+                teamID == 1 ? "BLUE" : "RED";
+
+            victoryText.text =
+                $"{teamName} VICTORIOUS";
+
+            victoryText.ForceMeshUpdate();
+        }
+        else
+        {
+            Debug.LogError(
+                "[VICTORY UI] VictoryText is NULL."
+            );
+        }
+
+        if (victoryPanelGroup != null)
+        {
+            victoryPanelGroup.gameObject.SetActive(true);
+            victoryPanelGroup.alpha = 1f;
+            victoryPanelGroup.interactable = false;
+            victoryPanelGroup.blocksRaycasts = false;
+        }
+        else
+        {
+            Debug.LogError(
+                "[VICTORY UI] VictoryPanelGroup is NULL."
+            );
+        }
     }
 }

@@ -1,0 +1,119 @@
+# Code Style Guide
+
+---
+
+**Document Version:** 0.1
+
+---
+
+# Philosophy
+
+Readable code is preferred over clever code.
+
+Gameplay systems should remain modular.
+
+---
+
+# Naming
+
+Classes
+
+PascalCase
+
+Example
+
+PlayerUnit
+
+Variables
+
+camelCase
+
+Example
+
+movementPoints
+
+Constants
+
+UPPER_CASE when appropriate.
+
+---
+
+# Responsibilities
+
+Each class should have one primary responsibility.
+
+Examples
+
+TurnManager
+
+Turn management only.
+
+PlayerUnit
+
+Player logic only.
+
+CameraFollow
+
+Camera control only.
+
+---
+
+# Inspector
+
+Gameplay values should be serialized whenever practical.
+
+Avoid hardcoded gameplay values.
+
+---
+
+# Debug Logs
+
+Use consistent prefixes.
+
+Examples
+
+[TURN]
+
+[CAMERA]
+
+[MAP]
+
+[BARS]
+
+[HIGHLIGHT]
+
+[DEBUG]
+
+---
+
+# Documentation
+
+Whenever a major system changes:
+
+- Update System Reference.
+- Update Changelog.
+- Update Known Issues if necessary.
+
+---
+
+# Git
+
+Recommended workflow
+
+Develop
+
+↓
+
+Test
+
+↓
+
+Commit
+
+↓
+
+Update Documentation
+
+↓
+
+Push

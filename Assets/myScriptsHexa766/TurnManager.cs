@@ -35,6 +35,8 @@ public class TurnManager : MonoBehaviour
     public Material sphereMaterial;
     public float sphereSize = 0.32f;
 
+
+
     // ---------------- STATE ----------------
     private Map1HexGrid map;
     public List<PlayerUnit> players = new List<PlayerUnit>();
@@ -45,8 +47,8 @@ public class TurnManager : MonoBehaviour
 
     private List<GameObject> highlights = new List<GameObject>();
     private bool isProcessingMove = false;
-
-
+    private EnemyDroneDirector enemyDroneDirector;
+    private bool enemyPhaseRunning = false;
 
     // ---------------- ATTACK STATE ----------------
     private PlayerUnit selectedAttackTarget;
@@ -63,16 +65,30 @@ public class TurnManager : MonoBehaviour
     void Start()
     {
         Debug.Log("[TURN] TurnManager Ready");
+
+        enemyDroneDirector =
+            FindFirstObjectByType<EnemyDroneDirector>();
+
+        if (enemyDroneDirector == null)
+        {
+            Debug.LogWarning(
+                "[TURN] EnemyDroneDirector not found."
+            );
+        }
     }
 
     public void BeginMatch()
     {
-        Debug.Log("[TURN] Beginning Match");
+        Debug.Log(
+            $"[TURN] Beginning Match | " +
+            $"currentIndex={currentIndex} | " +
+            $"current={(current != null ? current.name : "NULL")}"
+        );
 
         StartCoroutine(WaitForMapThenStartTurns());
     }
 
-    
+
     IEnumerator DelayedStart()
     {
         yield return null; // wait ONE frame for PlayerUnit.Awake()
@@ -99,6 +115,23 @@ public class TurnManager : MonoBehaviour
             return;
         }
 
+        if (enemyPhaseRunning)
+        {
+            return;
+        }
+
+        // Player2 just completed the round.
+        // Run the enemy phase before returning to Player1.
+        if (current != null &&
+            currentIndex == players.Count - 1 &&
+            enemyDroneDirector != null)
+        {
+            StartCoroutine(
+                RunEnemyPhaseThenStartNextRound()
+            );
+
+            return;
+        }
         ClearHighlights();
 
         currentIndex = (currentIndex + 1) % players.Count;
@@ -157,6 +190,36 @@ public class TurnManager : MonoBehaviour
         BeginCurrentTurn();
     }
 
+    private IEnumerator RunEnemyPhaseThenStartNextRound()
+    {
+        enemyPhaseRunning = true;
+
+        ClearHighlights();
+
+        // Prevent player interaction during enemy activity.
+        isProcessingMove = true;
+        current = null;
+
+        Debug.Log(
+            "[TURN] ===== ENEMY DRONE PHASE ====="
+        );
+
+        yield return
+            enemyDroneDirector.ExecuteEnemyPhaseAndWait();
+
+        Debug.Log(
+            "[TURN] ===== ENEMY DRONE PHASE COMPLETE ====="
+        );
+
+        // Prepare the normal turn code to select Player1.
+        currentIndex = -1;
+        current = null;
+
+        isProcessingMove = false;
+        enemyPhaseRunning = false;
+
+        StartNextTurn();
+    }
     private IEnumerator WaitForRespawnThenBeginTurn(PlayerUnit player)
     {
         if (player == null)

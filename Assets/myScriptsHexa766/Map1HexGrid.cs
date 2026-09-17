@@ -74,95 +74,95 @@ public class Map1HexGrid : MonoBehaviour
     GameObject player,
     Vector2Int targetTile,
     int targetVertex)
-{
-    var result = new List<(string tileName, int vertexIndex)>();
-
-    // Current player position
-    var (startTileName, startVertexIndex) = GetPlayerTileAndVertex(player);
-
-    if (string.IsNullOrEmpty(startTileName))
-        return result;
-
-    Vector3 start = GetVertexPosition(startTileName, startVertexIndex);
-
-    // Destination
-    string targetTileName = tileNameToGrid
-        .FirstOrDefault(kvp => kvp.Value == targetTile).Key;
-
-    if (string.IsNullOrEmpty(targetTileName))
-        return result;
-
-    Vector3 goal = GetVertexPosition(targetTileName, targetVertex);
-
-    if (!vertexGraph.ContainsKey(start) || !vertexGraph.ContainsKey(goal))
-        return result;
-
-    // ---------- Breadth-First Search ----------
-    Queue<Vector3> frontier = new Queue<Vector3>();
-    Dictionary<Vector3, Vector3> cameFrom = new Dictionary<Vector3, Vector3>();
-    HashSet<Vector3> visited = new HashSet<Vector3>();
-
-    frontier.Enqueue(start);
-    visited.Add(start);
-
-    bool found = false;
-
-    while (frontier.Count > 0)
     {
-        Vector3 current = frontier.Dequeue();
+        var result = new List<(string tileName, int vertexIndex)>();
 
-        if (current == goal)
+        // Current player position
+        var (startTileName, startVertexIndex) = GetPlayerTileAndVertex(player);
+
+        if (string.IsNullOrEmpty(startTileName))
+            return result;
+
+        Vector3 start = GetVertexPosition(startTileName, startVertexIndex);
+
+        // Destination
+        string targetTileName = tileNameToGrid
+            .FirstOrDefault(kvp => kvp.Value == targetTile).Key;
+
+        if (string.IsNullOrEmpty(targetTileName))
+            return result;
+
+        Vector3 goal = GetVertexPosition(targetTileName, targetVertex);
+
+        if (!vertexGraph.ContainsKey(start) || !vertexGraph.ContainsKey(goal))
+            return result;
+
+        // ---------- Breadth-First Search ----------
+        Queue<Vector3> frontier = new Queue<Vector3>();
+        Dictionary<Vector3, Vector3> cameFrom = new Dictionary<Vector3, Vector3>();
+        HashSet<Vector3> visited = new HashSet<Vector3>();
+
+        frontier.Enqueue(start);
+        visited.Add(start);
+
+        bool found = false;
+
+        while (frontier.Count > 0)
         {
-            found = true;
-            break;
+            Vector3 current = frontier.Dequeue();
+
+            if (current == goal)
+            {
+                found = true;
+                break;
+            }
+
+            foreach (Vector3 next in vertexGraph[current])
+            {
+                if (visited.Contains(next))
+                    continue;
+
+                visited.Add(next);
+                cameFrom[next] = current;
+                frontier.Enqueue(next);
+            }
         }
 
-        foreach (Vector3 next in vertexGraph[current])
+        if (!found)
         {
-            if (visited.Contains(next))
-                continue;
-
-            visited.Add(next);
-            cameFrom[next] = current;
-            frontier.Enqueue(next);
+            Debug.LogWarning("[PATH] No path found.");
+            return result;
         }
-    }
 
-    if (!found)
-    {
-        Debug.LogWarning("[PATH] No path found.");
+        // ---------- Reconstruct path ----------
+        List<Vector3> vertices = new List<Vector3>();
+
+        Vector3 step = goal;
+
+        while (step != start)
+        {
+            vertices.Add(step);
+            step = cameFrom[step];
+        }
+
+        vertices.Add(start);
+        vertices.Reverse();
+
+        // ---------- Convert to tile/vertex ----------
+        foreach (Vector3 v in vertices)
+        {
+            Vector3 rounded = RoundToGrid(v);
+
+            if (vertexToTile.TryGetValue(rounded, out var data))
+            {
+                result.Add((data.tileName, data.vertexIndex));
+            }
+        }
+
+        Debug.Log($"[PATH] Shortest path contains {result.Count} vertices.");
+
         return result;
     }
-
-    // ---------- Reconstruct path ----------
-    List<Vector3> vertices = new List<Vector3>();
-
-    Vector3 step = goal;
-
-    while (step != start)
-    {
-        vertices.Add(step);
-        step = cameFrom[step];
-    }
-
-    vertices.Add(start);
-    vertices.Reverse();
-
-    // ---------- Convert to tile/vertex ----------
-    foreach (Vector3 v in vertices)
-    {
-        Vector3 rounded = RoundToGrid(v);
-
-        if (vertexToTile.TryGetValue(rounded, out var data))
-        {
-            result.Add((data.tileName, data.vertexIndex));
-        }
-    }
-
-    Debug.Log($"[PATH] Shortest path contains {result.Count} vertices.");
-
-    return result;
-}
 
 
 
@@ -171,7 +171,7 @@ public class Map1HexGrid : MonoBehaviour
         Debug.Log($"[MAP] OnEnable() called — hasGenerated = {hasGenerated}");
     }
 
-    
+
     private const float GROUND_Y = 0.0f;
     private const float PLAYER_MODEL_PIVOT_TO_FEET = 0.0f;
     private const float PLAYER_GROUND_CLEARANCE = 0.00f;
@@ -300,7 +300,7 @@ public class Map1HexGrid : MonoBehaviour
         }
     }
 
-   
+
     private List<GameObject> hexTiles = new List<GameObject>();
     private Dictionary<Vector2, GameObject> hexMap = new Dictionary<Vector2, GameObject>();
     public Dictionary<string, GameObject> tileGameObjectMap = new Dictionary<string, GameObject>();
@@ -314,12 +314,12 @@ public class Map1HexGrid : MonoBehaviour
     public Dictionary<Vector3, (string tileName, int vertexIndex)> vertexToTile = new Dictionary<Vector3, (string, int)>();
 
     private List<GameObject> vertexMarkers = new List<GameObject>();
-   
-    
+
+
     private GameObject selectedVertexMarker;
     private bool isMoving = false;
 
- 
+
     private GameObject selectedVertexMarker2;
     private bool isMoving2 = false;
     public GameObject activePlayer;
@@ -383,13 +383,27 @@ public class Map1HexGrid : MonoBehaviour
     {
         Debug.Log("[MAP] GenerateAndPosition CALLED");
 
-        // Preserve players
+        // Preserve the legacy Player1 / Player2 references because
+        // existing debug/helper code still uses them.
         GameObject preservedPlayer1 = Player1;
         GameObject preservedPlayer2 = Player2;
 
-        // TEMPORARILY unparent players so they are not destroyed
-        if (preservedPlayer1 != null) preservedPlayer1.transform.SetParent(null);
-        if (preservedPlayer2 != null) preservedPlayer2.transform.SetParent(null);
+        // Preserve EVERY PlayerUnit, not only Player1 and Player2.
+        PlayerUnit[] preservedUnits =
+            FindObjectsByType<PlayerUnit>(
+                FindObjectsSortMode.None
+            );
+
+        // If a unit happens to be parented under this map object,
+        // detach it before ClearAllChildren() so it is not destroyed.
+        foreach (PlayerUnit unit in preservedUnits)
+        {
+            if (unit == null)
+                continue;
+
+            if (unit.transform.IsChildOf(transform))
+                unit.transform.SetParent(null);
+        }
 
         // Clear map-only objects
         ClearAllChildren();
@@ -402,45 +416,69 @@ public class Map1HexGrid : MonoBehaviour
             GenerateMap();
             BuildVertexGraph();
 
-            Debug.Log($"[MAP] AFTER BuildVertexGraph — tiles={tileGameObjectMap.Count}, vertices={vertexToTile.Count}");
+            Debug.Log(
+                $"[MAP] AFTER BuildVertexGraph — " +
+                $"tiles={tileGameObjectMap.Count}, " +
+                $"vertices={vertexToTile.Count}"
+            );
 
-            // Reattach & position players
-            if (preservedPlayer1 != null)
+            // Restore the two legacy references.
+            Player1 = preservedPlayer1;
+            Player2 = preservedPlayer2;
+
+            // Position EVERY unit according to teamID + unitID.
+            foreach (PlayerUnit unit in preservedUnits)
             {
-                Player1 = preservedPlayer1;
+                if (unit == null)
+                    continue;
+
+                if (!TryGetTeamSpawnPlacement(
+                        unit,
+                        out TileSelection spawnTile,
+                        out int spawnVertex))
+                {
+                    continue;
+                }
 
                 Debug.Log(
-                    $"<color=magenta><b>[PLACEMENT INPUT]</b></color> " +
-                    $"Player1 Tile={player1Tile} Vertex={player1VertexIndex}"
-);
-                PositionPlayer(Player1, player1Tile, player1VertexIndex);
-                EnsurePlayerFeedback(Player1);
+                    $"[TEAM SPAWN] {unit.name} | " +
+                    $"Team={unit.teamID} Unit={unit.unitID} | " +
+                    $"Tile={spawnTile} Vertex={spawnVertex}"
+                );
 
-                // 🔧 FORCE Player1 to rebind to the NEW vertex graph
-                GetPlayerTileAndVertex(Player1);
-            }
+                PositionPlayer(
+                    unit.gameObject,
+                    spawnTile,
+                    spawnVertex
+                );
 
-            if (preservedPlayer2 != null)
-            {
-                Player2 = preservedPlayer2;
-                PositionPlayer(Player2, player2Tile, player2VertexIndex);
-                EnsurePlayerFeedback(Player2);
+                EnsurePlayerFeedback(unit.gameObject);
 
-                // 🔧 FORCE Player2 to rebind to the NEW vertex graph
-                GetPlayerTileAndVertex(Player2);
+                // Rebind the unit to the newly generated vertex graph.
+                GetPlayerTileAndVertex(unit.gameObject);
             }
 
             hasGenerated = true;
-            Debug.Log($"[MAP] SUCCESS — vertexToTile has {vertexToTile.Count} entries");
+
+            Debug.Log(
+                $"[MAP] SUCCESS — vertexToTile has " +
+                $"{vertexToTile.Count} entries"
+            );
+
             Debug.Log("MAP INSTANCE = " + GetInstanceID());
 
             if (Application.isPlaying)
             {
-                TurnManager tm = FindObjectOfType<TurnManager>();
+                TurnManager tm =
+                    FindObjectOfType<TurnManager>();
 
-                if (tm != null)
+                if (tm != null && tm.current != null)
                 {
-                    Debug.Log("[MAP] Restarting turn system after GenerateAndPosition.");
+                    Debug.Log(
+                        "[MAP] Restarting turn system after " +
+                        "GenerateAndPosition."
+                    );
+
                     tm.RestartTurnsFromBeginning();
                 }
             }
@@ -450,9 +488,8 @@ public class Map1HexGrid : MonoBehaviour
             Debug.LogError("[MAP] FAILED: " + e);
             hasGenerated = false;
         }
-        
-
     }
+
 
     [ContextMenu("Position Test Box")]
     public void PositionTestBox()
@@ -528,7 +565,39 @@ public class Map1HexGrid : MonoBehaviour
         Debug.LogError($"[MAP] No grid coord for tile: {tileName}");
         return new Vector2Int(0, 0);
     }
-    
+
+    public bool TryGetTileCenterPosition(
+    string tileName,
+    out Vector3 position)
+    {
+        // Ordinary map tile
+        if (tileGameObjectMap.TryGetValue(
+                tileName,
+                out GameObject tile) &&
+            tile != null)
+        {
+            position = tile.transform.position;
+            return true;
+        }
+
+        // Special map landmark, such as PyramidCenter
+        if (landmarks.TryGetValue(
+                tileName,
+                out GameObject landmark) &&
+            landmark != null)
+        {
+            position = landmark.transform.position;
+            return true;
+        }
+
+        position = Vector3.zero;
+
+        Debug.LogWarning(
+            $"[MAP] No tile or landmark center found for {tileName}"
+        );
+
+        return false;
+    }
     public void PositionPlayer(GameObject player, TileSelection tileSel, int vertexIdx)
     {
         if (player == null) return;
@@ -552,23 +621,77 @@ public class Map1HexGrid : MonoBehaviour
         }
     }
 
-    public void RespawnPlayer(PlayerUnit player)
+    private bool TryGetTeamSpawnPlacement(
+        PlayerUnit unit,
+        out TileSelection spawnTile,
+        out int spawnVertex)
     {
-        Debug.Log($"[RESPAWN] Team={player.teamID}");
-        if (player == null) return;
+        spawnTile = TileSelection.OriginBlue;
+        spawnVertex = 0;
 
-        if (player.teamID == 1)
+        if (unit == null)
+            return false;
+
+        int baseVertex;
+
+        if (unit.teamID == 1)
         {
-            Debug.Log($"[RESPAWN] Respawning BLUE at {player1Tile} vertex {player1VertexIndex}");
-            PositionPlayer(player.gameObject, player1Tile, player1VertexIndex);
+            spawnTile = player1Tile;
+            baseVertex = player1VertexIndex;
+        }
+        else if (unit.teamID == 2)
+        {
+            spawnTile = player2Tile;
+            baseVertex = player2VertexIndex;
         }
         else
         {
-            Debug.Log($"[RESPAWN] Respawning RED at {player2Tile} vertex {player2VertexIndex}");
-            PositionPlayer(player.gameObject, player2Tile, player2VertexIndex);
+            Debug.LogWarning(
+                $"[TEAM SPAWN] {unit.name} has unsupported " +
+                $"TeamID={unit.teamID}."
+            );
+
+            return false;
         }
+
+        // Unit 1 keeps the team's existing configured vertex.
+        // Units 2-4 use the next vertices around the same home hex.
+        int unitOffset =
+            Mathf.Clamp(unit.unitID - 1, 0, 5);
+
+        spawnVertex =
+            (baseVertex + unitOffset) % 6;
+
+        return true;
     }
-    
+
+
+    public void RespawnPlayer(PlayerUnit player)
+    {
+        if (player == null)
+            return;
+
+        if (!TryGetTeamSpawnPlacement(
+                player,
+                out TileSelection spawnTile,
+                out int spawnVertex))
+        {
+            return;
+        }
+
+        Debug.Log(
+            $"[RESPAWN] {player.name} | " +
+            $"Team={player.teamID} Unit={player.unitID} | " +
+            $"Tile={spawnTile} Vertex={spawnVertex}"
+        );
+
+        PositionPlayer(
+            player.gameObject,
+            spawnTile,
+            spawnVertex
+        );
+    }
+
 
     [ContextMenu("Position Both Players")]
     void PositionBothPlayers()
@@ -686,8 +809,15 @@ public class Map1HexGrid : MonoBehaviour
         // ForceResetDropdowns();
     }
 
+    private void Start()
+    {
+        Debug.Log("[MAP] Automatic startup generation.");
+
+        GenerateAndPosition();
+    }
+
     [UnityEditor.Callbacks.DidReloadScripts]
-   
+
     private static void OnScriptsReloaded()
     {
         if (UnityEditor.EditorApplication.isPlaying)
@@ -1396,7 +1526,7 @@ public class Map1HexGrid : MonoBehaviour
         return reachable;
     }
 
-    
+
 
     private void aPlayerToVertex(GameObject player, string tileName, int vertexIndex)
     {
@@ -1439,7 +1569,7 @@ public class Map1HexGrid : MonoBehaviour
         }
         vertexMarkers.Clear();
 
-      
+
     }
 
     [ContextMenu("Generate Map")]
@@ -1451,7 +1581,7 @@ public class Map1HexGrid : MonoBehaviour
 
         CreateMap1();
         CreateLandmarks();
-       
+
 
         if (powerUpPrefab != null && powerUpInstance == null)
         {
@@ -1460,7 +1590,7 @@ public class Map1HexGrid : MonoBehaviour
             powerUpInstance.name = "PowerUpExtendedReach";
         }
 
-       
+
         BuildVertexGraph();
         List<Vector3> test = new List<Vector3>
     {
@@ -1468,7 +1598,7 @@ public class Map1HexGrid : MonoBehaviour
         transform.position + Vector3.right * 2,
         transform.position + Vector3.right * 4 + Vector3.forward * 2
     };
-  
+
 
         hasGenerated = true;
         Debug.Log($"MAP GENERATED! {tileNameToGrid.Count} tiles mapped to grid coordinates");
@@ -1584,7 +1714,7 @@ public class Map1HexGrid : MonoBehaviour
         return path;
     }
 
-    
+
 
     private IEnumerator MovePlayer(GameObject player, List<Vector3> path, System.Action onComplete, LineRenderer line)
     {
@@ -1619,7 +1749,7 @@ public class Map1HexGrid : MonoBehaviour
             showReachableTiles = false;
             ShowReachFromPlayer1();
         }
-       
+
     }
 
     void OnDestroy()

@@ -148,22 +148,66 @@ public class MissionIntro : MonoBehaviour
 
     #endregion
 
-    void Start()
+    IEnumerator Start()
     {
-        UnityEngine.Debug.Log("MISSION INTRO START " + GetInstanceID());
-        CanvasGroup fade = fadePanel.GetComponent<CanvasGroup>();
+        UnityEngine.Debug.Log(
+            "MISSION INTRO START " + GetInstanceID()
+        );
+
+        Map1HexGrid map =
+            FindFirstObjectByType<Map1HexGrid>();
+
+        if (map == null)
+        {
+            Debug.LogError(
+                "[MISSION INTRO] Map1HexGrid not found."
+            );
+
+            yield break;
+        }
+
+        Debug.Log(
+            "[MISSION INTRO] Waiting for generated map..."
+        );
+
+        while (
+            !map.hasGenerated ||
+            map.tileGameObjectMap == null ||
+            !map.tileGameObjectMap.ContainsKey("PyramidCenter") ||
+            !map.tileGameObjectMap.ContainsKey("AIStation")
+        )
+        {
+            yield return null;
+        }
+
+        // Rebind references to the NEW runtime-generated objects.
+        pyramid =
+            map.tileGameObjectMap["PyramidCenter"].transform;
+
+        aiStation =
+            map.tileGameObjectMap["AIStation"].transform;
+
+        Debug.Log(
+            $"[MISSION INTRO] Runtime targets rebound: " +
+            $"Pyramid={pyramid.name}, " +
+            $"AIStation={aiStation.name}"
+        );
+
+        CanvasGroup fade =
+            fadePanel.GetComponent<CanvasGroup>();
 
         fade.alpha = 0f;
 
         fadePanel.SetActive(false);
-       
 
         if (cameraFollow != null)
             cameraFollow.enabled = false;
+
         if (introMusic != null)
             introMusic.Play();
 
-        introCoroutine = StartCoroutine(IntroSequence());
+        introCoroutine =
+            StartCoroutine(IntroSequence());
     }
 
     IEnumerator IntroSequence()
@@ -231,7 +275,7 @@ public class MissionIntro : MonoBehaviour
 
         yield return Fade(storyGroup, 1f, 0f, 0.35f);
 
-        storyTitle.text = "ARCHON";
+        storyTitle.text = "ALEJ";
 
         yield return Fade(storyGroup, 0f, 1f, 0.35f);
 
@@ -310,7 +354,7 @@ public class MissionIntro : MonoBehaviour
 
         yield return TypeStory(
             "\"Commander...\"\n\n" +
-            "\"Restore ARCHON before\n" +
+            "\"AWAKE ALEJ before\n" +
             "your rivals do.\""
         );
 

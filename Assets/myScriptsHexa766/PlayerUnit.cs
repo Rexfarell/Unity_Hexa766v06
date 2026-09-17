@@ -8,15 +8,22 @@ using static UnityEngine.Rendering.DebugUI;
 
 public class PlayerUnit : MonoBehaviour
 {
-    public int teamID;               // 1 = Player1, 2 = Player2
+    [Header("UNIT IDENTITY")]
+    public int teamID;   // 1 = Blue, 2 = Red
+
+    public int unitID = 1;   // 1-4 within the team
+
+    public TeamController Team { get; private set; }
+
     public int energy = 100;
-    public int shield = 100;  // ← depletes before energy
+    public int shield = 100;
 
     public bool IsDead => isDead;
     public Vector2Int currentTileCoord;
     public int currentVertexIndex = 0;
+    public bool IsCarryingBox => isCarryingBox;
 
-  
+
     public System.Action OnMoveFinished;
     public System.Action onActionResolved;
     private bool isResolvingAction = false;
@@ -32,7 +39,7 @@ public class PlayerUnit : MonoBehaviour
     private int spawnVertexIndex;
     private bool isDead = false;
 
-    
+
     public float respawnDelay = 3f;
 
     private bool turnAlreadyFinished = false;
@@ -106,10 +113,40 @@ public class PlayerUnit : MonoBehaviour
     [SerializeField]
     private float deathVolume = 1f;
 
+    public void AssignTeam(TeamController team)
+    {
+        if (team == null)
+            return;
+
+        if (team.TeamID != teamID)
+        {
+            Debug.LogWarning(
+                $"[TEAM] Cannot assign {name} to {team.TeamName}. " +
+                $"Unit TeamID={teamID}, " +
+                $"Controller TeamID={team.TeamID}"
+            );
+
+            return;
+        }
+
+        Team = team;
+
+        Debug.Log(
+            $"[TEAM] {name} linked to {team.TeamName} | " +
+            $"Team={teamID} Unit={unitID}"
+        );
+    }
+
+
     void Start()
     {
         map = FindObjectOfType<Map1HexGrid>();
         turnManager = FindObjectOfType<TurnManager>();
+
+        if (GetComponent<UnitIdentityLabel>() == null)
+        {
+            gameObject.AddComponent<UnitIdentityLabel>();
+        }
 
         if (!map)
         {
@@ -123,13 +160,28 @@ public class PlayerUnit : MonoBehaviour
                 FindFirstObjectByType<AIStationFeedback>();
         }
 
-        //  REGISTER THIS UNIT WITH THE TURN MANAGER
+        // REGISTER THIS UNIT WITH THE TURN MANAGER
+        // Sort by team first, then by unit number
         if (turnManager != null && !turnManager.players.Contains(this))
         {
             turnManager.players.Add(this);
-            // Always keep Player1 before Player2
-            turnManager.players.Sort((a, b) => a.teamID.CompareTo(b.teamID));
-            Debug.Log($"[TURN] Registered player unit: {name}");
+
+            turnManager.players.Sort(
+                (a, b) =>
+                {
+                    int teamCompare =
+                        a.teamID.CompareTo(b.teamID);
+
+                    if (teamCompare != 0)
+                        return teamCompare;
+
+                    return a.unitID.CompareTo(b.unitID);
+                }
+            );
+
+            Debug.Log(
+                $"[TURN] Registered player unit: {name}"
+            );
         }
         else if (turnManager == null)
         {
@@ -628,7 +680,7 @@ public class PlayerUnit : MonoBehaviour
             DropBox();
         }
 
-        
+
     }
 
     void DropBox()
@@ -766,62 +818,68 @@ public class PlayerUnit : MonoBehaviour
             );
         }
 
-        // Start the respawn countdown independently.
+        // Start ONE respawn countdown.
         StartCoroutine(RespawnRoutine());
 
         // Give the death animation time to play.
         yield return new WaitForSeconds(5.0f);
 
-
-        // Start the respawn countdown independently.
-        StartCoroutine(RespawnRoutine());
-
-        // Give the death animation time to play.
-        yield return new WaitForSeconds(5.0f);
-
-        // If the movement already ended the turn, do NOT advance it again.
+        // If the movement already ended the turn,
+        // do NOT advance it again.
         if (turnAlreadyFinished)
         {
-            Debug.Log($"[{name}] DieRoutine: turn already finished. No second turn advance.");
+            Debug.Log(
+                $"[{name}] DieRoutine: turn already finished. " +
+                $"No second turn advance."
+            );
+
             yield break;
         }
 
-        // Death happened outside of an active movement completion.
-        Debug.Log($"[{name}] DieRoutine: ending turn after death.");
+        Debug.Log(
+            $"[{name}] DieRoutine: ending turn after death."
+        );
 
         turnAlreadyFinished = true;
 
         if (turnManager != null)
             turnManager.HandleMoveFinished();
     }
+
+
     private IEnumerator RespawnRoutine()
     {
-        Debug.Log($"[{name}] Respawn timer START at {Time.time:F2}");
+        Debug.Log(
+            $"[{name}] Respawn timer START at {Time.time:F2}"
+        );
 
         yield return new WaitForSeconds(respawnDelay);
 
-        Debug.Log($"[{name}] Respawn timer END at {Time.time:F2}");
+        Debug.Log(
+            $"[{name}] Respawn timer END at {Time.time:F2}"
+        );
 
         // Restore stats
         energy = 100;
         shield = 100;
 
-        // Refresh UI
-
+        // Hide carried box visual after respawn
         if (carriedBox != null)
         {
             carriedBox.SetActive(false);
-            Debug.Log($"[CARRIED BOX] {name} starting with carried box hidden.");
+
+            Debug.Log(
+                $"[CARRIED BOX] {name} starting with carried box hidden."
+            );
         }
         else
         {
-            Debug.LogWarning($"[CARRIED BOX] {name} has no Carried Box assigned.");
+            Debug.LogWarning(
+                $"[CARRIED BOX] {name} has no Carried Box assigned."
+            );
         }
 
         UpdateHealthBars();
-        UpdateHealthBars();
-
-        Debug.Log($"[RESPAWN] Energy={energy} Shield={shield}");
 
         // -------------------------------------------------
         // POSITION BEFORE MAP RESPAWN
@@ -855,7 +913,8 @@ public class PlayerUnit : MonoBehaviour
 
             Debug.Log(
                 $"[RESPAWN DEBUG] {name} MAP RESOLVED = " +
-                $"{resolvedLocation.tileName} v{resolvedLocation.vertexIndex}"
+                $"{resolvedLocation.tileName} " +
+                $"v{resolvedLocation.vertexIndex}"
             );
         }
         else
@@ -875,10 +934,13 @@ public class PlayerUnit : MonoBehaviour
         isDead = false;
 
         Debug.Log(
-            $"[RESPAWN END] {name} final position = {transform.position}"
+            $"[RESPAWN END] {name} final position = " +
+            $"{transform.position}"
         );
 
-        Debug.Log($"[{name}] Respawned.");
+        Debug.Log(
+            $"[{name}] Respawned."
+        );
     }
 
     public (int shieldLost, int energyLost) TakeAttackDamage(int amount)
@@ -1008,7 +1070,7 @@ public class PlayerUnit : MonoBehaviour
             Debug.Log($"Energy Scale AFTER = {energyBar.localScale}");
             scale.x = energyBarFullWidth * energyPercent;
             energyBar.localScale = scale;
-            
+
 
             Vector3 pos = energyBarStartPos;
             pos.x = energyBarStartPos.x - (energyBarFullWidth - scale.x) * 0.5f;
@@ -1058,7 +1120,7 @@ public class PlayerUnit : MonoBehaviour
             );
         }
     }
-    
+
     public void AttackImpact()
     {
         Debug.Log($"[ATTACK IMPACT] {name} impact frame reached.");
@@ -1203,22 +1265,16 @@ public class PlayerUnit : MonoBehaviour
             carriedBox.SetActive(false);
         }
 
-        // Delivered WorldBox is permanently consumed.
-        if (carriedWorldBox != null)
-        {
-            Destroy(
-                carriedWorldBox.gameObject
-            );
-
-            carriedWorldBox = null;
-        }
+        // Keep a reference to the delivered world box.
+        // We will redeploy it ONLY if this was not the winning delivery.
+        WorldBox deliveredBox = carriedWorldBox;
+        carriedWorldBox = null;
 
         isCarryingBox = false;
 
         // -----------------------------------------
         // DELIVERY VISUAL FEEDBACK
         // -----------------------------------------
-        // Make sure we have the actual visible station feedback component.
         if (aiStationFeedback == null)
         {
             aiStationFeedback =
@@ -1236,10 +1292,14 @@ public class PlayerUnit : MonoBehaviour
             aiStationFeedback.PlayDeliveryFlash();
         }
 
-        // Score + popup.
+        // -----------------------------------------
+        // SCORE + WIN CHECK
+        // -----------------------------------------
+        bool wonMatch = false;
+
         if (ScoreUI.Instance != null)
         {
-            ScoreUI.Instance.AddScore(
+            wonMatch = ScoreUI.Instance.AddScore(
                 teamID,
                 1
             );
@@ -1255,12 +1315,36 @@ public class PlayerUnit : MonoBehaviour
             );
         }
 
-        // IMPORTANT:
-        // Keep the delivery camera on the station/player
-        // while the pulse and score feedback are visible.
+        // -----------------------------------------
+        // REDEPLOY OBJECTIVE ONLY IF MATCH CONTINUES
+        // -----------------------------------------
+        if (!wonMatch && deliveredBox != null)
+        {
+            if (BoxDeploymentManager.Instance != null)
+            {
+                BoxDeploymentManager.Instance.RedeployDeliveredBox(
+                    deliveredBox
+                );
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "[BOX DEPLOYMENT] BoxDeploymentManager not found."
+                );
+            }
+        }
+        else if (wonMatch)
+        {
+            Debug.Log(
+                $"[MATCH END] Player {teamID} completed the final delivery."
+            );
+        }
+
+        // Keep delivery camera on station/player
+        // while pulse and score feedback are visible.
         yield return new WaitForSecondsRealtime(1.0f);
 
-        // Restore camera AFTER feedback has been shown.
+        // Restore camera AFTER feedback.
         if (cameraFollow != null)
         {
             Debug.Log(
@@ -1279,7 +1363,28 @@ public class PlayerUnit : MonoBehaviour
         isDeliveringBox = false;
         turnAlreadyFinished = true;
 
-        // Only now allow the next player's turn.
+        // Winning delivery stops the match here.
+        if (wonMatch)
+        {
+            if (ScoreUI.Instance != null)
+            {
+                ScoreUI.Instance.ShowVictory(teamID);
+            }
+            else
+            {
+                Debug.LogError(
+                    "[VICTORY UI] ScoreUI.Instance is NULL."
+                );
+            }
+
+            Debug.Log(
+                $"[MATCH END] Player {teamID} wins. No next turn."
+            );
+
+            yield break;
+        }
+
+        // Normal delivery: continue to next player.
         if (turnManager != null)
         {
             turnManager.HandleMoveFinished();
