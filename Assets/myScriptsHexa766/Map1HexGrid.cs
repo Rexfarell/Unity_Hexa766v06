@@ -71,36 +71,64 @@ public class Map1HexGrid : MonoBehaviour
     }
 
     public List<(string tileName, int vertexIndex)> GetShortestPath(
-    GameObject player,
-    Vector2Int targetTile,
-    int targetVertex)
+        GameObject player,
+        Vector2Int targetTile,
+        int targetVertex)
     {
-        var result = new List<(string tileName, int vertexIndex)>();
+        var result =
+            new List<(string tileName, int vertexIndex)>();
 
         // Current player position
-        var (startTileName, startVertexIndex) = GetPlayerTileAndVertex(player);
+        var (startTileName, startVertexIndex) =
+            GetPlayerTileAndVertex(player);
 
         if (string.IsNullOrEmpty(startTileName))
             return result;
 
-        Vector3 start = GetVertexPosition(startTileName, startVertexIndex);
+        Vector3 start =
+            GetVertexPosition(
+                startTileName,
+                startVertexIndex
+            );
 
         // Destination
-        string targetTileName = tileNameToGrid
-            .FirstOrDefault(kvp => kvp.Value == targetTile).Key;
+        string targetTileName =
+            tileNameToGrid
+                .FirstOrDefault(
+                    kvp => kvp.Value == targetTile
+                )
+                .Key;
 
         if (string.IsNullOrEmpty(targetTileName))
             return result;
 
-        Vector3 goal = GetVertexPosition(targetTileName, targetVertex);
+        Vector3 goal =
+            GetVertexPosition(
+                targetTileName,
+                targetVertex
+            );
 
-        if (!vertexGraph.ContainsKey(start) || !vertexGraph.ContainsKey(goal))
+        if (!vertexGraph.ContainsKey(start) ||
+            !vertexGraph.ContainsKey(goal))
+        {
             return result;
+        }
 
-        // ---------- Breadth-First Search ----------
-        Queue<Vector3> frontier = new Queue<Vector3>();
-        Dictionary<Vector3, Vector3> cameFrom = new Dictionary<Vector3, Vector3>();
-        HashSet<Vector3> visited = new HashSet<Vector3>();
+        PlayerUnit unit =
+            player.GetComponent<PlayerUnit>();
+
+        // =========================================
+        // CAPACITY-AWARE BREADTH-FIRST SEARCH
+        // =========================================
+
+        Queue<Vector3> frontier =
+            new Queue<Vector3>();
+
+        Dictionary<Vector3, Vector3> cameFrom =
+            new Dictionary<Vector3, Vector3>();
+
+        HashSet<Vector3> visited =
+            new HashSet<Vector3>();
 
         frontier.Enqueue(start);
         visited.Add(start);
@@ -109,7 +137,8 @@ public class Map1HexGrid : MonoBehaviour
 
         while (frontier.Count > 0)
         {
-            Vector3 current = frontier.Dequeue();
+            Vector3 current =
+                frontier.Dequeue();
 
             if (current == goal)
             {
@@ -117,49 +146,140 @@ public class Map1HexGrid : MonoBehaviour
                 break;
             }
 
-            foreach (Vector3 next in vertexGraph[current])
+            foreach (
+                Vector3 next
+                in vertexGraph[current]
+            )
             {
                 if (visited.Contains(next))
                     continue;
 
+                bool canEnter = true;
+
+                Vector3 roundedNext =
+                    RoundToGrid(next);
+
+                // ---------------------------------------------
+                // RESOLVE LOGICAL HEX
+                // ---------------------------------------------
+                if (vertexToTile.TryGetValue(
+                        roundedNext,
+                        out var nextData) &&
+                    tileGameObjectMap.TryGetValue(
+                        nextData.tileName,
+                        out GameObject nextTile))
+                {
+                    HexCapacity capacity =
+                        nextTile.GetComponent<HexCapacity>();
+
+                    // ---------------------------------------------
+                    // COLLAPSED HEX = REMOVED FROM EFFECTIVE GRAPH
+                    // ---------------------------------------------
+                    if (capacity != null &&
+                        capacity.IsCollapsed)
+                    {
+                        continue;
+                    }
+
+                    // ---------------------------------------------
+                    // EXISTING CAPACITY / LOAD RULE
+                    // ---------------------------------------------
+                    if (unit != null &&
+                        capacity != null)
+                    {
+                        Vector2Int nextCoord =
+                            GetTileGridCoord(
+                                nextData.tileName
+                            );
+
+                        // If this is the unit's current logical
+                        // hex, allow movement so an overloaded
+                        // unit can escape.
+                        if (nextCoord !=
+                            unit.currentTileCoord)
+                        {
+                            int projectedLoad =
+                                capacity.CurrentLoad +
+                                unit.EffectiveLoad;
+
+                            if (projectedLoad >
+                                capacity.EffectiveCapacity)
+                            {
+                                canEnter = false;
+                            }
+                        }
+                    }
+                }
+
+                if (!canEnter)
+                    continue;
+
                 visited.Add(next);
-                cameFrom[next] = current;
+
+                cameFrom[next] =
+                    current;
+
                 frontier.Enqueue(next);
             }
         }
 
         if (!found)
         {
-            Debug.LogWarning("[PATH] No path found.");
+            Debug.LogWarning(
+                "[PATH] No feasible path found."
+            );
+
             return result;
         }
 
-        // ---------- Reconstruct path ----------
-        List<Vector3> vertices = new List<Vector3>();
+        // =========================================
+        // RECONSTRUCT PATH
+        // =========================================
 
-        Vector3 step = goal;
+        List<Vector3> vertices =
+            new List<Vector3>();
+
+        Vector3 step =
+            goal;
 
         while (step != start)
         {
             vertices.Add(step);
-            step = cameFrom[step];
+
+            step =
+                cameFrom[step];
         }
 
         vertices.Add(start);
+
         vertices.Reverse();
 
-        // ---------- Convert to tile/vertex ----------
-        foreach (Vector3 v in vertices)
-        {
-            Vector3 rounded = RoundToGrid(v);
+        // =========================================
+        // CONVERT TO TILE / VERTEX PAIRS
+        // =========================================
 
-            if (vertexToTile.TryGetValue(rounded, out var data))
+        foreach (Vector3 vertex in vertices)
+        {
+            Vector3 rounded =
+                RoundToGrid(vertex);
+
+            if (vertexToTile.TryGetValue(
+                    rounded,
+                    out var data))
             {
-                result.Add((data.tileName, data.vertexIndex));
+                result.Add(
+                    (
+                        data.tileName,
+                        data.vertexIndex
+                    )
+                );
             }
         }
 
-        Debug.Log($"[PATH] Shortest path contains {result.Count} vertices.");
+        Debug.Log(
+            $"[PATH] Shortest feasible path contains " +
+            $"{result.Count} vertices."
+        );
 
         return result;
     }
@@ -1172,6 +1292,65 @@ public class Map1HexGrid : MonoBehaviour
         landmarks[name] = aiStation;
     }
 
+    private int GetStartingCapacityForHex(
+    string tileName
+)
+    {
+        switch (tileName)
+        {
+            // =====================================
+            // SAFE STAGING / SPECIAL AREAS
+            // =====================================
+
+            case "OriginBlue":
+            case "OriginRed":
+            case "AIStation":
+                return 12;
+
+
+            // =====================================
+            // HIGH-CAPACITY STAGING HEXES
+            // =====================================
+
+            case "Tile20":
+            case "Tile21":
+            case "Tile22":
+            case "Tile27":
+                return 9;
+
+
+            // =====================================
+            // NARROW / BOTTLENECK HEXES
+            // =====================================
+
+            case "Tile28":
+            case "Tile31":
+            case "Tile29":
+            case "Tile30":
+            case "Tile32":
+            case "Tile33":
+                return 3;
+
+
+            // =====================================
+            // CONDITIONAL LIGHT-WEIGHT ROUTES
+            // =====================================
+
+            case "Tile01":
+            case "Tile04":
+                return 2;
+
+
+            // =====================================
+            // STANDARD BATTLEFIELD
+            // =====================================
+
+            default:
+                return 6;
+        }
+    }
+
+
     void CreateHexTile(float x, float z, string name, bool isCenter)
     {
         Vector3 position = new Vector3(x, 0, z);
@@ -1187,6 +1366,13 @@ public class Map1HexGrid : MonoBehaviour
         hex.transform.SetParent(transform);
         hex.transform.position = position;
         hex.transform.rotation = Quaternion.Euler(0, 0, 180f);
+
+        HexCapacity capacity =
+            hex.AddComponent<HexCapacity>();
+
+        capacity.SetBaseCapacity(
+            GetStartingCapacityForHex(name)
+        );
 
         MeshFilter meshFilter = hex.AddComponent<MeshFilter>();
         MeshRenderer renderer = hex.AddComponent<MeshRenderer>();
@@ -1906,47 +2092,206 @@ public class Map1HexGrid : MonoBehaviour
         }
     }
 
-    public List<(string tileName, int vertexIndex)> GetReachableVerticesFromPlayerAsPairs(GameObject player, int maxSteps)
+    public bool CanUnitEnterTile(
+    PlayerUnit unit,
+    string tileName
+)
     {
-        var (tileName, vertexIndex) = GetPlayerTileAndVertex(player);
-        if (tileName == null || vertexIndex == -1) return new List<(string, int)>();
+        if (unit == null ||
+            string.IsNullOrEmpty(tileName))
+        {
+            return false;
+        }
 
-        Vector3 start = GetVertexPosition(tileName, vertexIndex);
-        if (!vertexGraph.ContainsKey(start)) return new List<(string, int)>();
+        if (!tileGameObjectMap.TryGetValue(
+                tileName,
+                out GameObject tile) ||
+            tile == null)
+        {
+            return false;
+        }
 
-        var reachable = new List<(string tileName, int vertexIndex)>();
-        var queue = new Queue<(Vector3 pos, int steps)>();
-        var visited = new HashSet<Vector3>();
+        HexCapacity capacity =
+            tile.GetComponent<HexCapacity>();
 
-        queue.Enqueue((start, 0));
+        // If a tile somehow has no capacity component,
+        // do not block legacy movement.
+        if (capacity == null)
+        {
+            return true;
+        }
+
+        Vector2Int targetCoord =
+            GetTileGridCoord(tileName);
+
+        int projectedLoad =
+            capacity.CurrentLoad;
+
+        // If the unit is already logically on this hex,
+        // it is already included in CurrentLoad.
+        if (unit.currentTileCoord != targetCoord)
+        {
+            projectedLoad +=
+                unit.EffectiveLoad;
+        }
+
+        return projectedLoad <=
+               capacity.EffectiveCapacity;
+    }
+
+    public List<(string tileName, int vertexIndex)>
+     GetReachableVerticesFromPlayerAsPairs(
+         GameObject player,
+         int maxSteps
+     )
+    {
+        var (tileName, vertexIndex) =
+            GetPlayerTileAndVertex(player);
+
+        if (tileName == null ||
+            vertexIndex == -1)
+        {
+            return new List<(string, int)>();
+        }
+
+        Vector3 start =
+            GetVertexPosition(
+                tileName,
+                vertexIndex
+            );
+
+        if (!vertexGraph.ContainsKey(start))
+        {
+            return new List<(string, int)>();
+        }
+
+        PlayerUnit unit =
+            player.GetComponent<PlayerUnit>();
+
+        var reachable =
+            new List<(string tileName, int vertexIndex)>();
+
+        var queue =
+            new Queue<(Vector3 pos, int steps)>();
+
+        var visited =
+            new HashSet<Vector3>();
+
+        queue.Enqueue(
+            (start, 0)
+        );
+
         visited.Add(start);
 
         while (queue.Count > 0)
         {
-            var (pos, steps) = queue.Dequeue();
+            var (pos, steps) =
+                queue.Dequeue();
 
             if (steps > 0)
             {
-                Vector3 roundedPos = RoundToGrid(pos);
-                if (vertexToTile.TryGetValue(roundedPos, out var data))
+                Vector3 roundedPos =
+                    RoundToGrid(pos);
+
+                if (vertexToTile.TryGetValue(
+                        roundedPos,
+                        out var data))
                 {
-                    reachable.Add((data.tileName, data.vertexIndex));
+                    reachable.Add(
+                        (
+                            data.tileName,
+                            data.vertexIndex
+                        )
+                    );
                 }
                 else
                 {
-                    Debug.LogWarning("[REACH] No vertex data for pos " + pos);
+                    Debug.LogWarning(
+                        "[REACH] No vertex data for pos " +
+                        pos
+                    );
                 }
             }
 
-            if (steps >= maxSteps) continue;
+            if (steps >= maxSteps)
+                continue;
 
-            foreach (var neighbor in vertexGraph[pos])
+            foreach (
+                var neighbor
+                in vertexGraph[pos]
+            )
             {
-                if (!visited.Contains(neighbor))
+                if (visited.Contains(neighbor))
+                    continue;
+
+                Vector3 roundedNeighbor =
+                    RoundToGrid(neighbor);
+
+                if (!vertexToTile.TryGetValue(
+                        roundedNeighbor,
+                        out var neighborData))
                 {
-                    visited.Add(neighbor);
-                    queue.Enqueue((neighbor, steps + 1));
+                    continue;
                 }
+
+                bool canEnter = true;
+
+                if (tileGameObjectMap.TryGetValue(
+                        neighborData.tileName,
+                        out GameObject targetTile))
+                {
+                    HexCapacity capacity =
+                        targetTile.GetComponent<HexCapacity>();
+
+                    // ---------------------------------------------
+                    // COLLAPSED HEX = REMOVED FROM EFFECTIVE GRAPH
+                    // ---------------------------------------------
+                    if (capacity != null &&
+                        capacity.IsCollapsed)
+                    {
+                        continue;
+                    }
+
+                    // ---------------------------------------------
+                    // EXISTING CAPACITY / LOAD RULE
+                    // ---------------------------------------------
+                    if (unit != null &&
+                        capacity != null)
+                    {
+                        Vector2Int targetCoord =
+                            GetTileGridCoord(
+                                neighborData.tileName
+                            );
+
+                        // Already on this logical hex:
+                        // never trap the unit inside it.
+                        if (targetCoord !=
+                            unit.currentTileCoord)
+                        {
+                            int projectedLoad =
+                                capacity.CurrentLoad +
+                                unit.EffectiveLoad;
+
+                            if (projectedLoad >
+                                capacity.EffectiveCapacity)
+                            {
+                                canEnter = false;
+                            }
+                        }
+                    }
+                }
+
+                if (!canEnter)
+                    continue;
+
+                visited.Add(neighbor);
+
+                queue.Enqueue(
+                    (
+                        neighbor,
+                        steps + 1
+                    )
+                );
             }
         }
 

@@ -208,7 +208,57 @@ public class TurnManager : MonoBehaviour
             enemyDroneDirector.ExecuteEnemyPhaseAndWait();
 
         Debug.Log(
-            "[TURN] ===== ENEMY DRONE PHASE COMPLETE ====="
+     "[TURN] ===== ENEMY DRONE PHASE COMPLETE ====="
+ );
+
+        // ---------------------------------------------
+        // ROUND-END HEX OVERLOAD CHECK
+        // ---------------------------------------------
+        HexCapacity[] hexCapacities =
+            FindObjectsByType<HexCapacity>(
+                FindObjectsSortMode.None
+            );
+
+        foreach (HexCapacity hex in hexCapacities)
+        {
+            if (hex != null)
+            {
+                hex.EvaluateRoundEnd();
+            }
+        }
+
+        // ---------------------------------------------
+        // WAIT FOR STRUCTURAL FAILURE SEQUENCES
+        // ---------------------------------------------
+        bool collapseStillRunning = true;
+
+        while (collapseStillRunning)
+        {
+            collapseStillRunning = false;
+
+            foreach (HexCapacity hex in hexCapacities)
+            {
+                if (hex != null &&
+                    hex.IsCollapseSequenceRunning)
+                {
+                    collapseStillRunning = true;
+                    break;
+                }
+            }
+
+            if (collapseStillRunning)
+            {
+                yield return null;
+            }
+        }
+
+        Debug.Log(
+            "[ROUND END] Structural failure sequences complete."
+        );
+
+        Debug.Log(
+            $"[ROUND END] Evaluated " +
+            $"{hexCapacities.Length} hex capacities."
         );
 
         // Prepare the normal turn code to select Player1.

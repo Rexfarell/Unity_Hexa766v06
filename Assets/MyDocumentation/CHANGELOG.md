@@ -80,7 +80,7 @@ Shifted the introduction from a conventional game briefing to an archaeological 
 - Death turn handling is now controlled by `DieRoutine()`.
 
 08/18/2026
-Basic combat system with automatic same-hex attacks and manually selected adjacent attacks using K. 
+Basic combat system with automatic same-hex attacks and manually selected adjacent attacks using K.
 Added shield-first attack damage and attack animation event handling.
 
 # Changelog
@@ -162,3 +162,47 @@ The v0.3 direction explicitly preserves the working:
 ### Not yet implemented
 
 This version entry records the design/architecture milestone. The single-box manager, win condition, result screen, power-ups, and drone hive remain implementation work.
+
+
+
+## [0.3.2] - 2026-09-29
+
+### Added
+
+- Added playable Mass Dampener Subsystem.
+- Added playable Ballast Injection Subsystem.
+- Added playable Structural Reinforcement Subsystem.
+- Added playable Network Stress Subsystem.
+- Added `SubsystemController`.
+- Added `SubsystemFeedbackUI`.
+- Added HEXA_766 themed tactical Subsystem notifications.
+- Added NO EFFECT and NO VALID TARGET feedback states.
+
+### Changed
+
+- Unit-based Subsystem targeting now uses screen-space bounds derived
+  from visible PlayerUnit Renderers.
+- Added targeting padding for easier robot selection.
+- Mass Dampener ignores units already at minimum Effective Load.
+- Ballast Injection ignores units already at maximum Effective Load.
+- Increased Subsystem feedback display duration.
+
+### Rules
+
+- One successful Subsystem may be activated per PlayerUnit turn.
+- Failed attempts do not consume the Subsystem.
+- Effective Load remains constrained to 1–5.
+- Mass Dampener modifies allied Effective Load by -1.
+- Ballast Injection modifies enemy Effective Load by +1.
+- Structural Reinforcement modifies hex Capacity by +3.
+- Network Stress modifies hex Capacity by -3.
+
+### Preserved
+
+- Existing TurnManager sequence.
+- Movement and pathfinding.
+- Combat.
+- Objective lifecycle.
+- Enemy phase.
+- Structural-collapse system.
+- 4v4 player-turn architecture.

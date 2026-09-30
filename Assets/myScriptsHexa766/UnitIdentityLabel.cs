@@ -2,19 +2,38 @@ using UnityEngine;
 
 public class UnitIdentityLabel : MonoBehaviour
 {
+    [Header("LABEL POSITION")]
     [SerializeField]
-    private float height = 1.4f;
+    private float height = 2.0f;
+
+    [Header("LABEL SIZE")]
+    [SerializeField]
+    private float inactiveTextSize = 0.10f;
 
     [SerializeField]
-    private float textSize = 0.12f;
+    private float activeTextSize = 0.22f;
+
+    [Header("LABEL OPACITY")]
+    [SerializeField]
+    private float inactiveOpacity = 0.55f;
+
+    [SerializeField]
+    private float activeOpacity = 1.0f;
 
     private TextMesh label;
     private Camera mainCamera;
 
+    // These were missing.
+    private PlayerUnit unit;
+    private TurnManager turnManager;
+
     private void Start()
     {
-        PlayerUnit unit =
+        unit =
             GetComponent<PlayerUnit>();
+
+        turnManager =
+            FindFirstObjectByType<TurnManager>();
 
         if (unit == null)
         {
@@ -57,7 +76,7 @@ public class UnitIdentityLabel : MonoBehaviour
         label.fontSize = 64;
 
         label.characterSize =
-            textSize;
+            inactiveTextSize;
 
         label.anchor =
             TextAnchor.MiddleCenter;
@@ -65,7 +84,13 @@ public class UnitIdentityLabel : MonoBehaviour
         label.alignment =
             TextAlignment.Center;
 
-        label.color = Color.white;
+        label.color =
+            new Color(
+                1f,
+                1f,
+                1f,
+                inactiveOpacity
+            );
 
         mainCamera = Camera.main;
     }
@@ -81,12 +106,55 @@ public class UnitIdentityLabel : MonoBehaviour
         if (mainCamera == null)
             return;
 
-        // Keep the label a fixed WORLD distance
-        // above the robot.
+        if (turnManager == null)
+        {
+            turnManager =
+                FindFirstObjectByType<TurnManager>();
+        }
+
+        // Is this the unit whose turn is currently active?
+        bool isActiveUnit =
+            turnManager != null &&
+            turnManager.current == unit;
+
+        float targetSize =
+            isActiveUnit
+            ? activeTextSize
+            : inactiveTextSize;
+
+        float targetOpacity =
+            isActiveUnit
+            ? activeOpacity
+            : inactiveOpacity;
+
+        // Smooth size transition.
+        label.characterSize =
+            Mathf.Lerp(
+                label.characterSize,
+                targetSize,
+                Time.deltaTime * 8f
+            );
+
+        // Smooth opacity transition.
+        Color currentColor =
+            label.color;
+
+        currentColor.a =
+            Mathf.Lerp(
+                currentColor.a,
+                targetOpacity,
+                Time.deltaTime * 8f
+            );
+
+        label.color =
+            currentColor;
+
+        // Fixed WORLD-space height above the robot.
         label.transform.position =
             transform.position +
             Vector3.up * height;
 
+        // Always face the camera.
         Vector3 direction =
             label.transform.position -
             mainCamera.transform.position;

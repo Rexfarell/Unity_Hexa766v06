@@ -13,12 +13,66 @@ public class PlayerUnit : MonoBehaviour
 
     public int unitID = 1;   // 1-4 within the team
 
+    [Header("MASS / LOAD")]
+
+    [Min(1)]
+    [SerializeField]
+    private int baseMass = 3;
+
+    [SerializeField]
+    private int loadModifier = 0;
+
+    public int BaseMass =>
+        baseMass;
+
+    public int LoadModifier =>
+        loadModifier;
+
+    public int EffectiveLoad =>
+     Mathf.Clamp(
+         baseMass + loadModifier,
+         1,
+         5
+     );
+
+    public bool ApplyLoadModifier(int amount)
+    {
+        if (isDead || amount == 0)
+            return false;
+
+        int before =
+            EffectiveLoad;
+
+        int target =
+            Mathf.Clamp(
+                before + amount,
+                1,
+                5
+            );
+
+        if (target == before)
+            return false;
+
+        loadModifier =
+            target - baseMass;
+
+        Debug.Log(
+            $"[SUBSYSTEM LOAD] {name} | " +
+            $"{before} → {EffectiveLoad} | " +
+            $"Modifier={LoadModifier}"
+        );
+
+        return true;
+    }
+
     public TeamController Team { get; private set; }
 
     public int energy = 100;
     public int shield = 100;
 
     public bool IsDead => isDead;
+    public bool IsMoving => isMoving;
+
     public Vector2Int currentTileCoord;
     public int currentVertexIndex = 0;
     public bool IsCarryingBox => isCarryingBox;
@@ -113,6 +167,8 @@ public class PlayerUnit : MonoBehaviour
     [SerializeField]
     private float deathVolume = 1f;
 
+
+
     public void AssignTeam(TeamController team)
     {
         if (team == null)
@@ -146,6 +202,16 @@ public class PlayerUnit : MonoBehaviour
         if (GetComponent<UnitIdentityLabel>() == null)
         {
             gameObject.AddComponent<UnitIdentityLabel>();
+        }
+
+        if (GetComponent<ActiveUnitRing>() == null)
+        {
+            gameObject.AddComponent<ActiveUnitRing>();
+        }
+
+        if (GetComponent<CorrosionFeedback>() == null)
+        {
+            gameObject.AddComponent<CorrosionFeedback>();
         }
 
         if (!map)
@@ -188,15 +254,21 @@ public class PlayerUnit : MonoBehaviour
             Debug.LogError($"[{name}] TurnManager missing!");
         }
 
-        currentTileCoord = map.WorldToGridCoord(transform.position);
-        currentVertexIndex = 0;
+        Debug.Log(
+            $"[{name}] start logical @ " +
+            $"{currentTileCoord} " +
+            $"v{currentVertexIndex}"
+        );
 
         Debug.Log($"[{name}] start @ {currentTileCoord} v{currentVertexIndex}");
 
         if (animator == null)
         {
             animator = GetComponentInChildren<Animator>(true);
-            Debug.Log($"[{name}] Animator bound to {animator?.gameObject.name}", this);
+            Debug.Log(
+                $"[{name}] Animator bound to {animator?.gameObject.name}",
+                this
+            );
         }
 
         if (shieldBar != null)
@@ -775,6 +847,76 @@ public class PlayerUnit : MonoBehaviour
         isCarryingBox = false;
     }
 
+
+    public void DieFromStructuralCollapse()
+    {
+        if (isDead)
+            return;
+
+        // Structural collapse happens outside the unit's
+        // normal action flow. Do not let DieRoutine
+        // advance the turn later.
+        turnAlreadyFinished = true;
+
+        Debug.Log(
+            $"[STRUCTURAL DEATH] {name} destroyed by collapsing hex."
+        );
+
+        // Start the special collapse visual.
+        StartCoroutine(
+            StructuralCollapseFallRoutine()
+        );
+
+        // Keep the normal death / respawn system intact.
+        Die();
+    }
+
+    private IEnumerator StructuralCollapseFallRoutine()
+    {
+        // Tiny pause so the normal death animation
+        // can begin before the floor disappears.
+        yield return new WaitForSeconds(0.05f);
+
+        Vector3 startPosition =
+            transform.position;
+
+        float fallDistance = 3.5f;
+        float fallDuration = 0.70f;
+
+        float elapsed = 0f;
+
+        while (elapsed < fallDuration)
+        {
+            elapsed += Time.deltaTime;
+
+            float t =
+                Mathf.Clamp01(
+                    elapsed / fallDuration
+                );
+
+            // Accelerating fall rather than constant speed.
+            float fallT =
+                t * t;
+
+            transform.position =
+                startPosition +
+                Vector3.down *
+                fallDistance *
+                fallT;
+
+            yield return null;
+        }
+
+        transform.position =
+            startPosition +
+            Vector3.down *
+            fallDistance;
+
+        Debug.Log(
+            $"[STRUCTURAL DEATH] {name} fell into collapsed hex."
+        );
+    }
+
     public void Die()
     {
         if (isDead)
@@ -1004,7 +1146,11 @@ public class PlayerUnit : MonoBehaviour
         // Shield absorbs damage first
         if (shield > 0)
         {
-            shieldLost = Mathf.Min(shield, amount);
+            shieldLost = Mathf.Min(
+                shield,
+                amount
+            );
+
             shield -= shieldLost;
             amount -= shieldLost;
         }
@@ -1012,7 +1158,11 @@ public class PlayerUnit : MonoBehaviour
         // Remaining damage goes to energy
         if (amount > 0)
         {
-            energyLost = Mathf.Min(energy, amount);
+            energyLost = Mathf.Min(
+                energy,
+                amount
+            );
+
             energy -= energyLost;
         }
 
@@ -1024,6 +1174,27 @@ public class PlayerUnit : MonoBehaviour
             $"→  <color=yellow>S:{shield}</color>  " +
             $"<color=lime>E:{energy}</color>"
         );
+
+        // -----------------------------------------
+        // CORROSION VISUAL FEEDBACK
+        // -----------------------------------------
+
+        CorrosionFeedback corrosionFeedback =
+            GetComponent<CorrosionFeedback>();
+
+        if (corrosionFeedback != null)
+        {
+            corrosionFeedback.Play(
+                shieldLost,
+                energyLost
+            );
+        }
+        else
+        {
+            Debug.LogWarning(
+                $"[CORROSION FEEDBACK] {name} has no CorrosionFeedback component."
+            );
+        }
 
         if (energy <= 0)
         {
@@ -1396,4 +1567,44 @@ public class PlayerUnit : MonoBehaviour
             );
         }
     }
+
+    [ContextMenu("DEBUG — Add +1 Load")]
+    private void DebugAddLoad()
+    {
+        loadModifier++;
+
+        Debug.Log(
+            $"[LOAD DEBUG] {name} | " +
+            $"BaseMass={BaseMass} | " +
+            $"Modifier={LoadModifier} | " +
+            $"EffectiveLoad={EffectiveLoad}"
+        );
+    }
+
+    [ContextMenu("DEBUG — Remove -1 Load")]
+    private void DebugRemoveLoad()
+    {
+        loadModifier--;
+
+        Debug.Log(
+            $"[LOAD DEBUG] {name} | " +
+            $"BaseMass={BaseMass} | " +
+            $"Modifier={LoadModifier} | " +
+            $"EffectiveLoad={EffectiveLoad}"
+        );
+    }
+
+    [ContextMenu("DEBUG — Reset Load Modifier")]
+    private void DebugResetLoadModifier()
+    {
+        loadModifier = 0;
+
+        Debug.Log(
+            $"[LOAD DEBUG] {name} | " +
+            $"BaseMass={BaseMass} | " +
+            $"Modifier={LoadModifier} | " +
+            $"EffectiveLoad={EffectiveLoad}"
+        );
+    }
+
 }

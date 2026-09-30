@@ -330,3 +330,102 @@ Players should repeatedly face meaningful choices between:
 - Exploiting or avoiding drone pressure.
 
 The board should create counterplay, not guaranteed equality.
+
+
+v 0.3.2 **Last Updated:** 2026-09-29
+
+# Subsystems
+
+Each active player unit may use one successful Subsystem during its turn.
+
+A failed attempt does not consume the Subsystem opportunity.
+
+## Effective Load
+
+Each robot has an Effective Load value.
+
+Normal Effective Load:
+
+3
+
+Allowed range:
+
+1–5
+
+Effective Load determines how much structural load the robot contributes
+to the logical hex that it occupies.
+
+Reaching Effective Load 5 does not mean that the robot itself is
+overloaded. Structural overload is determined by comparing the total
+load on a hex against that hex's Capacity.
+
+## Mass Dampener
+
+Input: 1
+
+Target: allied robot
+
+Effect:
+
+Effective Load -1
+
+Minimum Effective Load:
+
+1
+
+If the target has already reached Effective Load 1, the Subsystem has
+no effect and is not consumed.
+
+## Ballast Injection
+
+Input: 2
+
+Target: enemy robot
+
+Effect:
+
+Effective Load +1
+
+Maximum Effective Load:
+
+5
+
+If the target has already reached Effective Load 5, the Subsystem has
+no effect and is not consumed.
+
+## Structural Reinforcement
+
+Input: 3
+
+Target: hex
+
+Effect:
+
+Capacity +3
+
+## Network Stress
+
+Input: 4
+
+Target: hex
+
+Effect:
+
+Capacity -3
+
+## Subsystem Feedback
+
+Successful and unsuccessful Subsystem actions generate an on-screen
+HEXA_766 tactical readout.
+
+Feedback communicates the resulting load or capacity state so the
+player does not need to infer the effect from the Inspector or Console.
+
+## Planned Team Cohesion Rule
+
+Future implementation:
+
+If all four living members of one team occupy the same logical hex,
+the team's shields will be restored to full.
+
+This rule is planned but is not implemented in v0.3.2.

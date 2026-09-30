@@ -20,6 +20,21 @@ public class EnemyDrone : MonoBehaviour
     [SerializeField]
     private float carrierThreatMultiplier = 2f;
 
+    [SerializeField]
+    private float inactiveTextSize = 0.09f;
+
+    [SerializeField]
+    private float activeTextSize = 0.14f;
+
+    [SerializeField]
+    private float inactiveOpacity = 0.55f;
+
+    [SerializeField]
+    private float activeOpacity = 1.0f;
+
+    private PlayerUnit unit;
+    private TurnManager turnManager;
+
     private string previousTileName = null;
 
     public bool IsBusy { get; private set; }
@@ -516,8 +531,8 @@ public class EnemyDrone : MonoBehaviour
 
 
     private List<Vector2Int> FindEnemyPath(
-        Vector2Int start,
-        Vector2Int target)
+    Vector2Int start,
+    Vector2Int target)
     {
         Queue<Vector2Int> frontier =
             new Queue<Vector2Int>();
@@ -553,10 +568,29 @@ public class EnemyDrone : MonoBehaviour
                 if (string.IsNullOrEmpty(tileName))
                     continue;
 
-                // Permanent enemy rule:
-                // AI Station center is forbidden.
+                // -----------------------------------------
+                // PERMANENT ENEMY RULE:
+                // AI STATION CENTER IS FORBIDDEN
+                // -----------------------------------------
                 if (tileName == "AIStation")
                     continue;
+
+                // -----------------------------------------
+                // COLLAPSED HEX = REMOVED FROM ENEMY GRAPH
+                // -----------------------------------------
+                if (map.tileGameObjectMap.TryGetValue(
+                        tileName,
+                        out GameObject tileObject))
+                {
+                    HexCapacity capacity =
+                        tileObject.GetComponent<HexCapacity>();
+
+                    if (capacity != null &&
+                        capacity.IsCollapsed)
+                    {
+                        continue;
+                    }
+                }
 
                 visited.Add(next);
                 cameFrom[next] = current;

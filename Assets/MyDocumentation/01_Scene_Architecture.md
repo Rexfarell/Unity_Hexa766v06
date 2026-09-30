@@ -233,3 +233,33 @@ Current enemy responsibility includes:
 - Allowing individual drones to select targets from all living player units.
 
 Automatic hive-spawn cadence remains separate future work.
+
+
+## v0.3.2 — Subsystem UI and Controller
+
+The scene now contains a dedicated gameplay controller for the
+Subsystem system.
+
+### Scene object
+
+Subsystems
+- SubsystemController
+
+`SubsystemController` handles player input, Subsystem availability,
+unit/hex targeting, and successful-use tracking.
+
+### GameUI additions
+
+GameUI
+└── SubsystemFeedbackPanel
+    └── SubsystemFeedbackText
+
+`SubsystemFeedbackPanel` contains:
+- Image
+- CanvasGroup
+- SubsystemFeedbackUI
+
+`SubsystemFeedbackText` is a TextMeshPro UGUI element used for
+HEXA_766 system-style tactical notifications.
+
+The feedback panel does not block gameplay raycasts.

@@ -525,3 +525,138 @@ Objective access
 ```
 
 This is a design model, not yet a required numeric formula.
+
+
+v0.3.2
+
+# SubsystemController
+
+## Purpose
+
+`SubsystemController` manages the playable HEXA_766 Subsystem layer.
+
+Subsystems are tactical actions that manipulate unit Effective Load
+or hex Capacity without replacing the existing movement, combat,
+objective, or turn systems.
+
+## Current Subsystems
+
+### 1 — Mass Dampener
+
+Target: allied PlayerUnit
+
+Effect:
+
+Effective Load -1
+
+Minimum Effective Load: 1
+
+A unit already at Effective Load 1 cannot receive an additional
+Mass Dampener effect.
+
+### 2 — Ballast Injection
+
+Target: enemy PlayerUnit
+
+Effect:
+
+Effective Load +1
+
+Maximum Effective Load: 5
+
+A unit already at Effective Load 5 cannot receive an additional
+Ballast Injection effect.
+
+### 3 — Structural Reinforcement
+
+Target: HexCapacity
+
+Effect:
+
+Capacity +3
+
+### 4 — Network Stress
+
+Target: HexCapacity
+
+Effect:
+
+Capacity -3
+
+## Turn Rule
+
+Each PlayerUnit may successfully activate one Subsystem during its turn.
+
+An unsuccessful attempt does not consume the Subsystem opportunity.
+
+Subsystems cannot be activated while:
+- the active unit is dead;
+- the active unit is moving;
+- the Enemy Phase is running.
+
+## Unit Targeting
+
+Unit-based Subsystems use screen-space targeting derived from the
+visible Renderers belonging to each PlayerUnit.
+
+The target area receives additional screen-space padding to make
+selection practical without depending on a precise collider hit.
+
+When several units are visually close, invalid units that have already
+reached the applicable Effective Load limit can be excluded from the
+candidate set.
+
+## Dependencies
+
+- TurnManager
+- PlayerUnit
+- HexCapacity
+- EnemyDroneDirector
+- SubsystemFeedbackUI
+
+---
+
+# SubsystemFeedbackUI
+
+## Purpose
+
+Displays temporary tactical feedback after Subsystem attempts.
+
+The UI uses a HEXA_766 system-readout presentation.
+
+Feedback includes:
+- Subsystem identity;
+- selected target when applicable;
+- Effective Load or Capacity change;
+- resulting value;
+- hex load/state where applicable;
+- NO EFFECT conditions;
+- NO VALID TARGET conditions.
+
+The display duration is intentionally longer than the original
+prototype notification to allow the player to read the tactical result.
+
+---
+
+# PlayerUnit — Effective Load
+
+Each PlayerUnit has:
+
+- Base Mass;
+- Load Modifier;
+- Effective Load.
+
+Effective Load is constrained to the range:
+
+1–5
+
+The normal base value is:
+
+3
+
+`ApplyLoadModifier()` provides the gameplay entry point used by
+unit-based Subsystems.
+
+Effective Load represents the amount of load that the robot contributes
+to its current logical hex. It is not the robot's health and does not
+directly represent structural overload.

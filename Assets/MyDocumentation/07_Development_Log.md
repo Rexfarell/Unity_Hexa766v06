@@ -236,10 +236,10 @@ This fix preserves the previously working respawn and health-bar behavior while 
 
 Basic Attack System Implemented
 
-Implemented and tested the first combat system. Same-hex hostile units trigger an automatic Attack1 animation when movement finishes. 
-Adjacent hostile units require explicit target selection followed by K input. Attack targeting is vertex-specific for adjacent targets 
-while movement restrictions remain vertex-based. Shield-first damage was implemented at 25 damage per attack. Animation Events were configured 
-through PlayerAnimationEvents because the Animator is on the Robot_Blue Variant child rather than the PlayerUnit parent. 
+Implemented and tested the first combat system. Same-hex hostile units trigger an automatic Attack1 animation when movement finishes.
+Adjacent hostile units require explicit target selection followed by K input. Attack targeting is vertex-specific for adjacent targets
+while movement restrictions remain vertex-based. Shield-first damage was implemented at 25 damage per attack. Animation Events were configured
+through PlayerAnimationEvents because the Animator is on the Robot_Blue Variant child rather than the PlayerUnit parent.
 Tested successfully for both same-hex and adjacent-target attacks.
 
 
@@ -382,3 +382,102 @@ The score texts are now anchored to opposite top corners, keeping the center of 
 ### Result
 
 Version 0.3.1 establishes a stable 4v4 structural baseline for future team tactics, active-unit feedback, power-ups, and programmable/AI behavior.
+
+
+## 2026-09-29 — v0.3.2 Core Subsystems
+
+### Objective
+
+Convert the existing Mass / Effective Load / Capacity foundation into
+a playable tactical Subsystem layer.
+
+### Implemented Subsystems
+
+1. Mass Dampener
+   - Allied Effective Load -1.
+   - Minimum Effective Load = 1.
+
+2. Ballast Injection
+   - Enemy Effective Load +1.
+   - Maximum Effective Load = 5.
+
+3. Structural Reinforcement
+   - Target hex Capacity +3.
+
+4. Network Stress
+   - Target hex Capacity -3.
+
+### Turn Integration
+
+SubsystemController tracks the active PlayerUnit through TurnManager.
+
+A successful Subsystem consumes the unit's Subsystem opportunity for
+that turn.
+
+Failed attempts do not consume the opportunity.
+
+Subsystem use is blocked while the unit is moving, dead, or during the
+Enemy Phase.
+
+### Unit Targeting Investigation
+
+Initial unit targeting depended heavily on collider-based mouse hover
+and proved inconsistent.
+
+A fixed-radius screen-space approach improved targeting but remained
+unreliable because a single assumed world-space point did not always
+correspond to the visible robot.
+
+The targeting system was replaced with screen-space bounds calculated
+from the PlayerUnit's visible child Renderers.
+
+Additional padding makes the selectable region more forgiving.
+
+A further edge case occurred when multiple nearby robots overlapped
+in screen space. A robot that had already reached the applicable
+Effective Load limit could be selected and produce a no-effect result.
+
+Target filtering was therefore added:
+
+- Mass Dampener excludes allied units already at Effective Load 1.
+- Ballast Injection excludes enemy units already at Effective Load 5.
+
+Testing confirmed substantially improved unit selection reliability.
+
+### Feedback UI
+
+Added SubsystemFeedbackUI and a dedicated feedback panel under GameUI.
+
+The original debug-style notification was replaced by a HEXA_766
+system-readout presentation.
+
+Current feedback includes successful value changes as well as:
+
+- NO EFFECT;
+- NO VALID TARGET;
+- minimum Effective Load reached;
+- maximum Effective Load reached.
+
+Display duration was increased to improve readability.
+
+### Preserved Systems
+
+No redesign was made to:
+
+- TurnManager flow;
+- player movement;
+- pathfinding;
+- combat;
+- objective lifecycle;
+- enemy phase;
+- structural collapse;
+- 4v4 turn order.
+
+### Next Planned Mechanic
+
+Team cohesion / regroup rule:
+
+When all four living members of one team occupy the same logical hex,
+their shields will be restored to full.
+
+This mechanic is not part of v0.3.2.

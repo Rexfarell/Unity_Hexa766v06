@@ -104,3 +104,56 @@ Blue_1 → Blue_2 → Blue_3 → Blue_4
 ### Status
 
 The 4v4 structural baseline and multi-unit drone targeting are operational. Automatic hive-spawn rules, power-ups, and later programmable/AI strategy layers remain subsequent work.
+
+
+
+## v0.3.2 — Core Subsystems
+
+**Gameplay milestone: 2026-09-29**
+
+Version 0.3.2 introduces the first playable implementation of the
+HEXA_766 Subsystem layer.
+
+### Identity of the version
+
+> Manipulate load. Manipulate capacity. Change the structural state
+> without replacing the underlying graph.
+
+### Core Subsystems
+
+- Mass Dampener: allied Effective Load -1.
+- Ballast Injection: enemy Effective Load +1.
+- Structural Reinforcement: hex Capacity +3.
+- Network Stress: hex Capacity -3.
+
+### Effective Load
+
+Robot Effective Load is now directly manipulated through gameplay.
+
+Normal value:
+
+3
+
+Allowed range:
+
+1–5
+
+### Interaction Model
+
+Unit Subsystems use forgiving screen-space targeting based on the
+visible robot geometry.
+
+Hex Subsystems continue to operate directly on HexCapacity targets.
+
+Only successful Subsystem activations consume the unit's Subsystem
+opportunity for the turn.
+
+### Interface
+
+A dedicated HEXA_766 tactical feedback card now reports Subsystem
+results and invalid-state conditions.
+
+### Next Development Step
+
+Implement the planned team-regroup mechanic in which all four living
+members of a team occupying one logical hex restore their shields.
