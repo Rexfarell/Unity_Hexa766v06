@@ -1,35 +1,65 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 using static UnityEditor.PlayerSettings;
+using static UnityEngine.Rendering.DebugUI;
 
 public class PlayerUnit : MonoBehaviour
 {
     public int teamID;               // 1 = Player1, 2 = Player2
     public int energy = 100;
-    public int movementPoints = 1;
+    public int shield = 100;  // ← depletes before energy
+    
     public Vector2Int currentTileCoord;
     public int currentVertexIndex = 0;
-
+    public System.Action OnMoveFinished;
+    public System.Action onActionResolved;
+    private bool isResolvingAction = false;
+    private TurnManager turnManager;
     private Map1HexGrid map;
+    private bool isMoving = false;
+
+    [SerializeField] private Animator animator;
+    [SerializeField] private GameObject carriedBox; // robot internal box
+    [SerializeField] private float moveSpeed = 3f;
+    private bool isCarryingBox = false;
 
     void Start()
     {
         map = FindObjectOfType<Map1HexGrid>();
+        turnManager = FindObjectOfType<TurnManager>();
+
         if (!map)
         {
             Debug.LogError($"[{name}] Map1HexGrid missing!");
             return;
         }
 
-        // Use the real grid coord from world position
-        currentTileCoord = map.WorldToGridCoord(transform.position);
+        // 🔑 REGISTER THIS UNIT WITH THE TURN MANAGER
+        if (turnManager != null && !turnManager.players.Contains(this))
+        {
+            turnManager.players.Add(this);
+            Debug.Log($"[TURN] Registered player unit: {name}");
+        }
+        else if (turnManager == null)
+        {
+            Debug.LogError($"[{name}] TurnManager missing!");
+        }
 
-        // Vertex will be set on first move — default to 0
+        currentTileCoord = map.WorldToGridCoord(transform.position);
         currentVertexIndex = 0;
 
         Debug.Log($"[{name}] start @ {currentTileCoord} v{currentVertexIndex}");
+
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+            Debug.Log($"[{name}] Animator bound to {animator?.gameObject.name}", this);
+        }
     }
+
 
     public bool IsValidMove(Vector2Int tile, int v)
     {
@@ -37,106 +67,262 @@ public class PlayerUnit : MonoBehaviour
 
         int dq = tile.x - currentTileCoord.x;
         int dr = tile.y - currentTileCoord.y;
-        if (Mathf.Abs(dq) > 1 || Mathf.Abs(dr) > 1 || Mathf.Abs(dq + dr) > 1) return false;  // ← THIS LINE IS KILLING YOU
+        if (Mathf.Abs(dq) > 1 || Mathf.Abs(dr) > 1 || Mathf.Abs(dq + dr) > 1)
+            return false;
 
-        // ... rest
-        return movementPoints > 0;
+        return !isMoving;
     }
 
     public void ResetTurn()
     {
-        movementPoints = 1;
+        // Intentionally empty.
+        // A player gets exactly one move per turn.
+        // The movement range comes from map.defaultMovePoints,
+        // not from a per-player movement counter.
     }
 
     public bool MoveToTile(Vector2Int tileCoord, int vertexIdx)
     {
-        Debug.Log($"[MOVE] MoveToTile called — from {currentTileCoord} v{currentVertexIndex} to {tileCoord} v{vertexIdx}");
-        Debug.Log("[SOUND] Trying to play cyberBurstSound — is null? " + (map.cyberBurstSound == null));
+        if (isMoving)
+            return false;
 
-        if (map == null)
+        TurnManager tm = FindObjectOfType<TurnManager>();
+        if (tm != null && tm.IsVertexOccupied(tileCoord, vertexIdx, this))
         {
-            Debug.LogError("[MOVE] Map reference missing!");
+            Debug.Log("[MOVE BLOCKED] Vertex already occupied");
             return false;
         }
 
-        // REVERSE LOOKUP: grid coord → tile name → vertex position
-        string tileName = map.tileNameToGrid.FirstOrDefault(kvp => kvp.Value == tileCoord).Key;
+        Debug.Log($"[MOVE] MoveToTile — {currentTileCoord} v{currentVertexIndex} → {tileCoord} v{vertexIdx}");
 
-        // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
-        // MOVE THIS LINE UP — DECLARE pos HERE
-        Vector3 pos;
-        if (!string.IsNullOrEmpty(tileName))
+        var path = map.GetShortestPath(
+            gameObject,
+            tileCoord,
+            vertexIdx);
+
+        if (path == null || path.Count == 0)
         {
-            pos = map.GetVertexPosition(tileName, vertexIdx);
-        }
-        else
-        {
-            Debug.LogWarning($"[{name}] No tile name for coord {tileCoord} — fallback to current position");
-            pos = transform.position;
-        }
-        // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
-
-        StartCoroutine(SmoothMove(pos));
-        currentTileCoord = tileCoord;
-        currentVertexIndex = vertexIdx;
-
-        // PLAY SOUND — NOW pos IS IN SCOPE
-        map.PlayBurstSound(pos);
-
-        int dmg = Random.Range(20, 81);
-        energy = Mathf.Max(0, energy - dmg);
-        Debug.Log($"[{name}] moved to {tileCoord} v{vertexIdx} – dmg {dmg} – energy {energy}");
-
-        if (energy <= 0)
-        {
-            gameObject.SetActive(false);
-            Debug.Log($"{name} KO");
+            Debug.LogWarning("[MOVE] No path found.");
+            return false;
         }
 
-        movementPoints--;
+        StartCoroutine(SmoothMove(path));
         return true;
     }
-    IEnumerator SmoothMove(Vector3 target)
+
+
+
+    private IEnumerator SmoothMove(List<(string tileName, int vertexIndex)> path)
     {
-        Vector3 start = transform.position;
-        float t = 0, dur = 0.4f;
-        while (t < dur)
+        isMoving = true;
+
+        foreach (var step in path)
         {
-            transform.position = Vector3.Lerp(start, target, t / dur);
-            t += Time.deltaTime;
-            yield return null;
+            Vector3 targetPos = map.GetVertexPosition(step.tileName, step.vertexIndex);
+
+            while (Vector3.Distance(transform.position, targetPos) > 0.01f)
+            {
+                transform.position = Vector3.MoveTowards(
+                    transform.position,
+                    targetPos,
+                    moveSpeed * Time.deltaTime
+                );
+
+                yield return null;
+            }
+
+            transform.position = targetPos;
+
+            // Update logical position as each vertex is reached.
+            currentTileCoord = map.GetTileGridCoord(step.tileName);
+            currentVertexIndex = step.vertexIndex;
         }
-        transform.position = target;
+
+        isMoving = false;
+
+        TryPickupBox();
+
+        if (!isCarryingBox)
+        {
+            turnManager.HandleMoveFinished();
+        }
     }
 
-    
-    // ==============================================================
-    // HELPER: Convert Vector2Int → World Position → Tile GameObject
-    // ==============================================================
-    private GameObject GetTileObject(Vector2Int gridPos)
+
+    void TryPickupBox()
     {
-        // Convert grid coordinates to world position (hex grid layout)
-        float cellSize = map.hexSize + map.gapSize;
-        Vector3 worldPos = new Vector3(
-            gridPos.x * 1.5f * cellSize,
-            0f,
-            gridPos.y * (Mathf.Sqrt(3f) * cellSize)
+        if (isCarryingBox) return;
+
+        WorldBox box = FindBoxOnMyVertex();
+        if (box == null) return;
+
+        StartCoroutine(PickupSequence(box));
+    }
+    
+    void DebugBoxesOnMyTile()
+    {
+        Debug.Log($"[DEBUG OWNER] {name}", this);
+
+        WorldBox[] boxes = FindObjectsOfType<WorldBox>();
+
+        Debug.Log(
+            $"[PICKUP CHECK] Player at tile {currentTileCoord}, vertex {currentVertexIndex}. Boxes found: {boxes.Length}"
         );
 
-        // Offset every other row
-        if (gridPos.y % 2 != 0)
-            worldPos.x += 0.75f * cellSize;
+        if (boxes.Length > 0)
+        {
+            Debug.Log("First box name: " + boxes[0].name);
+        }
 
-        // Use map.TileAt() to get tile name
-        string tileName = map.TileAt(worldPos);
+        foreach (WorldBox box in boxes)
+        {
+            Debug.Log(
+                $"[BOX] tile ({box.tileX}, {box.tileY}), vertex {box.vertexIndex}, active={box.gameObject.activeSelf}"
+            );
+        }
+    }
+
+    WorldBox FindBoxOnMyVertex()
+    {
+        WorldBox[] boxes = FindObjectsOfType<WorldBox>();
+
+        // Get the exact vertex world position the player moved to
+        string tileName = map.tileNameToGrid
+            .FirstOrDefault(kvp => kvp.Value == currentTileCoord).Key;
+
         if (string.IsNullOrEmpty(tileName))
             return null;
 
-        // Try direct lookup
-        if (map.tileGameObjectMap.TryGetValue(tileName, out GameObject tile))
-            return tile;
+        Vector3 myVertexWorldPos = map.GetVertexPosition(tileName, currentVertexIndex);
 
-        // Fallback
-        return GameObject.Find(tileName);
+        const float pickupRadius = 0.15f; // SMALL, deterministic
+
+        foreach (WorldBox box in boxes)
+        {
+            if (!box.gameObject.activeSelf)
+                continue;
+
+            Transform t = box.visualRoot != null ? box.visualRoot : box.transform;
+
+            float dist = Vector3.Distance(t.position, myVertexWorldPos);
+
+            Debug.Log($"[PICKUP DIST] {box.name} → {dist}");
+
+            if (dist <= pickupRadius)
+                return box;
+        }
+
+        return null;
     }
+
+
+
+    IEnumerator PickupSequence(WorldBox box)
+    {
+        Debug.Log($"[PICKUP] Picking up {box.name}", this);
+        
+
+        Debug.Log("[PICKUP] Triggering BoxUp", animator);
+
+        if (animator != null)
+        {
+            animator.enabled = true;
+
+            // HARD RESET — fixes Player2 desync
+            animator.Rebind();
+            animator.Update(0f);
+
+            Debug.Log($"[BOXUP] Trigger fired by {name} at frame {Time.frameCount}");
+            animator.ResetTrigger("BoxDown");
+            animator.ResetTrigger("BoxUp");
+            animator.SetTrigger("BoxUp");
+        }
+
+        else
+        {
+            Debug.LogError($"[PICKUP] No Animator found for {name}");
+        }
+
+        yield return new WaitForSeconds(0.8f);
+
+        box.gameObject.SetActive(false);
+
+        if (carriedBox != null)
+            carriedBox.SetActive(true);
+
+        isCarryingBox = true;
+
+        // PICKUP CONSUMES THE TURN
+ 
+
+        if (turnManager != null)
+        {
+            Debug.Log("[PICKUP] Pickup complete. Ending turn.");
+            turnManager.HandleMoveFinished();
+        }
+    }
+
+    
+
+    IEnumerator DropBoxFinalize()
+    {
+        yield return new WaitForSeconds(0.7f); // match animation length
+
+        if (carriedBox != null)
+            carriedBox.SetActive(false);
+
+        isCarryingBox = false;
+
+        Debug.Log($"[BOXDOWN] {name} finished drop");
+
+        onActionResolved?.Invoke();
+    }
+    void Update()
+    {
+        if (turnManager == null) return;
+        if (turnManager.current != this) return;
+
+        if (Input.GetKeyDown(KeyCode.B))
+        {
+            Debug.Log($"[INPUT] B pressed by {name}");
+            DropBox();
+        }
+    }
+
+    void DropBox()
+    {
+        if (!isCarryingBox) return;
+
+        Animator animator = GetComponentInChildren<Animator>(true);
+        if (animator != null)
+        {
+            animator.ResetTrigger("BoxUp");
+            animator.SetTrigger("BoxDown");
+        }
+
+        // Spawn new world box at current vertex
+        WorldBox newBox = Instantiate(
+            FindObjectOfType<WorldBox>(),
+            transform.position,
+            Quaternion.identity
+        );
+
+        newBox.tileX = currentTileCoord.x;
+        newBox.tileY = currentTileCoord.y;
+        newBox.vertexIndex = currentVertexIndex;
+
+        // Team color
+        Renderer r = newBox.GetComponentInChildren<Renderer>();
+        if (r != null)
+            r.material.color = teamID == 1 ? Color.blue : Color.red;
+
+        if (carriedBox != null)
+            carriedBox.SetActive(false);
+
+        isCarryingBox = false;
+
+        Debug.Log($"[BOXDOWN] {name} dropped box");
+    }
+
+
 }

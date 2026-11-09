@@ -20,9 +20,11 @@ public class CameraFollow : MonoBehaviour
         SnapToTarget();
     }
 
+    
     void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+            return;
 
         FollowTarget();
     }

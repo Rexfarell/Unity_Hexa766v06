@@ -9,19 +9,23 @@ public class PlayerClickFeedback : MonoBehaviour
         originalScale = transform.localScale;
     }
 
-    private void OnMouseEnter()
+    void OnMouseEnter()
     {
-        // Hover feedback (scale up)
-        transform.localScale = originalScale * 1.2f;
+        // 🔒 HARD GUARD — never allow hover reach during turns
+        if (TurnManager.Instance != null && TurnManager.Instance.current != null)
+            return;
 
-        var grid = FindObjectOfType<Map1HexGrid>();
-        if (grid == null || !grid.hasGenerated) return;   // ← THIS LINE PREVENTS EARLY CALL
+        Map1HexGrid map = FindObjectOfType<Map1HexGrid>();
+        if (map == null) return;
 
-        if (gameObject == grid.Player1)
-            grid.ShowReachFromPlayer1();
-        else if (gameObject == grid.Player2)
-            grid.ShowReachFromPlayer2();
+        // Use EXISTING methods only
+        if (gameObject.name.Contains("Player1"))
+            map.ShowReachFromPlayer1();
+        else if (gameObject.name.Contains("Player2"))
+            map.ShowReachFromPlayer2();
     }
+
+
 
     private void OnMouseExit()
     {

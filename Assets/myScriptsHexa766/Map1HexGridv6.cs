@@ -13,15 +13,6 @@ public class Map1HexGrid : MonoBehaviour
         Debug.Log($"[MAP] OnEnable() called — hasGenerated = {hasGenerated}");
     }
 
-    void Start()
-    {
-        if (!hasGenerated)
-        {
-            Debug.Log("[MAP] Start() — generating map now...");
-            GenerateAndPosition();
-        }
-    }
-
     
     private const float GROUND_Y = 0.0f;
     private const float PLAYER_MODEL_PIVOT_TO_FEET = 0.0f;
@@ -141,34 +132,7 @@ public class Map1HexGrid : MonoBehaviour
         }
     }
 
-    private void SetupPathLines()
-    {
-        if (pathLine == null)
-        {
-            pathLine = gameObject.AddComponent<LineRenderer>();
-            pathLine.material = new Material(Shader.Find("Sprites/Default"));
-            pathLine.startWidth = pathLine.endWidth = 0.15f;
-            pathLine.alignment = LineAlignment.View;
-            pathLine.positionCount = 0;
-            pathLine.startColor = pathLine.endColor = Color.yellow;
-        }
-
-        if (pathLine2 == null)
-        {
-            pathLine2 = gameObject.AddComponent<LineRenderer>();
-            pathLine2.material = new Material(Shader.Find("Sprites/Default"));
-            pathLine2.startWidth = pathLine2.endWidth = 0.15f;
-            pathLine2.alignment = LineAlignment.View;
-            pathLine2.positionCount = 0;
-            pathLine2.startColor = pathLine2.endColor = Color.cyan;
-        }
-
-        if (pathMaterial != null)
-        {
-            pathLine.material = pathMaterial;
-            pathLine2.material = pathMaterial;
-        }
-    }
+   
     private List<GameObject> hexTiles = new List<GameObject>();
     private Dictionary<Vector2, GameObject> hexMap = new Dictionary<Vector2, GameObject>();
     public Dictionary<string, GameObject> tileGameObjectMap = new Dictionary<string, GameObject>();
@@ -182,13 +146,12 @@ public class Map1HexGrid : MonoBehaviour
     public Dictionary<Vector3, (string tileName, int vertexIndex)> vertexToTile = new Dictionary<Vector3, (string, int)>();
 
     private List<GameObject> vertexMarkers = new List<GameObject>();
-    private LineRenderer pathLine;
-    private List<Vector3> currentPath = new List<Vector3>();
+   
+    
     private GameObject selectedVertexMarker;
     private bool isMoving = false;
 
-    private LineRenderer pathLine2;
-    private List<Vector3> currentPath2 = new List<Vector3>();
+ 
     private GameObject selectedVertexMarker2;
     private bool isMoving2 = false;
     public GameObject activePlayer;
@@ -250,36 +213,50 @@ public class Map1HexGrid : MonoBehaviour
     [ContextMenu("Generate and Position")]
     public void GenerateAndPosition()
     {
+        Debug.Log("[MAP] GenerateAndPosition CALLED");
+
+        // Preserve players
         GameObject preservedPlayer1 = Player1;
         GameObject preservedPlayer2 = Player2;
 
+        // TEMPORARILY unparent players so they are not destroyed
+        if (preservedPlayer1 != null) preservedPlayer1.transform.SetParent(null);
+        if (preservedPlayer2 != null) preservedPlayer2.transform.SetParent(null);
+
+        // Clear map-only objects
         ClearAllChildren();
-        vertexToTile.Clear();     // ← ADD THIS
-        vertexGraph.Clear();      // ← AND THIS
-       
+        vertexToTile.Clear();
+        vertexGraph.Clear();
+        tileGameObjectMap.Clear();
 
         try
         {
             GenerateMap();
             BuildVertexGraph();
-            Debug.Log($"[MAP] AFTER BuildVertexGraph — tileGameObjectMap has {tileGameObjectMap.Count} tiles, vertexToTile has {vertexToTile.Count} entries");
 
-            // Players back
+            Debug.Log($"[MAP] AFTER BuildVertexGraph — tiles={tileGameObjectMap.Count}, vertices={vertexToTile.Count}");
+
+            // Reattach & position players
             if (preservedPlayer1 != null)
             {
                 Player1 = preservedPlayer1;
                 PositionPlayer(Player1, player1Tile, player1VertexIndex);
                 EnsurePlayerFeedback(Player1);
+
+                // 🔧 FORCE Player1 to rebind to the NEW vertex graph
+                GetPlayerTileAndVertex(Player1);
             }
+
             if (preservedPlayer2 != null)
             {
                 Player2 = preservedPlayer2;
                 PositionPlayer(Player2, player2Tile, player2VertexIndex);
                 EnsurePlayerFeedback(Player2);
+
+                // 🔧 FORCE Player2 to rebind to the NEW vertex graph
+                GetPlayerTileAndVertex(Player2);
             }
 
-            SetupPathLines();
-            BuildVertexGraph();
             hasGenerated = true;
             Debug.Log($"[MAP] SUCCESS — vertexToTile has {vertexToTile.Count} entries");
         }
@@ -288,7 +265,11 @@ public class Map1HexGrid : MonoBehaviour
             Debug.LogError("[MAP] FAILED: " + e);
             hasGenerated = false;
         }
+        
+
     }
+
+
 
     private void EnsurePlayerFeedback(GameObject player)
     {
@@ -442,13 +423,9 @@ public class Map1HexGrid : MonoBehaviour
         tileGameObjectMap = new Dictionary<string, GameObject>();
         landmarks = new Dictionary<string, GameObject>();
         ForceResetDropdowns();
-
-        // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
-        // ADD THIS LINE — THE ONLY THING MISSING
-        if (!hasGenerated)
-            GenerateAndPosition();
-        // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
     }
+
+
 
     [UnityEditor.Callbacks.DidReloadScripts]
     private static void OnScriptsReloaded()
@@ -1050,35 +1027,7 @@ public class Map1HexGrid : MonoBehaviour
         return reachable;
     }
 
-    void HighlightReachableVertices(List<Vector3> vertices)
-    {
-        foreach (var m in vertexMarkers)
-        {
-            if (m != null)
-            {
-                if (Application.isPlaying) Destroy(m);
-                else DestroyImmediate(m);
-            }
-        }
-        vertexMarkers.Clear();
-
-        foreach (var v in vertices)
-        {
-            GameObject marker = Instantiate(vertexMarkerPrefab, v + Vector3.up * 0.05f, Quaternion.identity);
-            marker.transform.SetParent(transform);
-            marker.name = "VertexMarker";
-            marker.GetComponent<Renderer>().sharedMaterial = vertexMarkerMaterial ?? CreateVertexMaterial(reachableVertexColor);
-            marker.transform.localScale = Vector3.one * 0.15f;
-
-            var collider = marker.AddComponent<SphereCollider>();
-            collider.radius = 1.5f;
-
-            var clickable = marker.AddComponent<VertexClickHandler>();
-            clickable.onClicked += () => OnVertexClicked(v, marker, activePlayer);
-
-            vertexMarkers.Add(marker);
-        }
-    }
+    
 
     private void aPlayerToVertex(GameObject player, string tileName, int vertexIndex)
     {
@@ -1108,6 +1057,7 @@ public class Map1HexGrid : MonoBehaviour
 
     void ClearPathAndMarkers()
     {
+        // Clear reach spheres (vertexMarkers) — KEEP THIS
         foreach (var m in vertexMarkers)
         {
             if (m != null)
@@ -1120,28 +1070,7 @@ public class Map1HexGrid : MonoBehaviour
         }
         vertexMarkers.Clear();
 
-        if (pathLine != null)
-        {
-            if (Application.isPlaying)
-                Destroy(pathLine.gameObject);
-            else
-                DestroyImmediate(pathLine.gameObject);
-        }
-        pathLine = null;
-
-        if (pathLine2 != null)
-        {
-            if (Application.isPlaying)
-                Destroy(pathLine2.gameObject);
-            else
-                DestroyImmediate(pathLine2.gameObject);
-        }
-        pathLine2 = null;
-
-        currentPath.Clear();
-        currentPath2.Clear();
-        selectedVertexMarker = null;
-        selectedVertexMarker2 = null;
+      
     }
 
     [ContextMenu("Generate Map")]
@@ -1162,7 +1091,7 @@ public class Map1HexGrid : MonoBehaviour
             powerUpInstance.name = "PowerUpExtendedReach";
         }
 
-        InitializePathLines();
+       
         BuildVertexGraph();
         List<Vector3> test = new List<Vector3>
     {
@@ -1170,7 +1099,7 @@ public class Map1HexGrid : MonoBehaviour
         transform.position + Vector3.right * 2,
         transform.position + Vector3.right * 4 + Vector3.forward * 2
     };
-        DrawPath(test, pathLine, Color.yellow);
+  
 
         hasGenerated = true;
         Debug.Log($"MAP GENERATED! {tileNameToGrid.Count} tiles mapped to grid coordinates");
@@ -1178,44 +1107,7 @@ public class Map1HexGrid : MonoBehaviour
         Debug.Log($"[MAP] Generation COMPLETE — vertexToTile has {vertexToTile.Count} entries. Ready for pathfinding.");
     }
 
-    private void InitializePathLines()
-    {
-        if (pathLine == null)
-        {
-            GameObject go = new GameObject("PathLine_Player1");
-            go.transform.SetParent(transform);
-            pathLine = go.AddComponent<LineRenderer>();
-        }
-
-        if (pathLine2 == null)
-        {
-            GameObject go = new GameObject("PathLine_Player2");
-            go.transform.SetParent(transform);
-            pathLine2 = go.AddComponent<LineRenderer>();
-        }
-
-        if (pathMaterial != null)
-        {
-            pathLine.material = pathMaterial;
-            pathLine2.material = pathMaterial;
-        }
-
-        pathLine.startWidth = pathLine.endWidth = 0.15f;
-        pathLine2.startWidth = pathLine2.endWidth = 0.15f;
-        pathLine.alignment = pathLine2.alignment = LineAlignment.View;
-    }
-
-    void DrawPath(List<Vector3> path, LineRenderer lineRenderer, Color color)
-    {
-        if (path == null || path.Count < 2 || lineRenderer == null) return;
-
-        lineRenderer.positionCount = path.Count;
-        lineRenderer.SetPositions(path.ToArray());
-        lineRenderer.startColor = lineRenderer.endColor = color;
-
-        if (pathMaterial != null)
-            lineRenderer.material = pathMaterial;
-    }
+    
 
     public Vector3 GetVertexPosition(string tileName, int vertexIndex)
     {
@@ -1307,60 +1199,7 @@ public class Map1HexGrid : MonoBehaviour
         return path;
     }
 
-    void OnVertexClicked(Vector3 targetVertex, GameObject marker, GameObject player)
-    {
-        if ((player == Player1 && isMoving) || (player == Player2 && isMoving2)) return;
-
-        GameObject opponent = player == Player1 ? Player2 : Player1;
-        if (opponent != null)
-        {
-            Vector3 oppPos = RoundToGrid(opponent.transform.position);
-            if (Vector3.Distance(RoundToGrid(targetVertex), oppPos) < 0.02f)
-            {
-                Debug.Log($"BLOCKED: {player.name} cannot move to {opponent.name}'s vertex!");
-                return;
-            }
-        }
-
-        if (player == Player1 && selectedVertexMarker != null)
-            ResetMarkerMaterial(selectedVertexMarker);
-        else if (player == Player2 && selectedVertexMarker2 != null)
-            ResetMarkerMaterial(selectedVertexMarker2);
-
-        if (player == Player1) selectedVertexMarker = marker;
-        else selectedVertexMarker2 = marker;
-
-        StartCoroutine(BurstAnimation(marker, player));
-
-        var (startTile, startIdx) = GetPlayerTileAndVertex(player);
-        if (startTile == null)
-        {
-            Debug.LogError("Player not on valid vertex!");
-            return;
-        }
-
-        Vector3 startVertex = GetVertexPosition(startTile, startIdx);
-        List<Vector3> path = FindShortestPath(startVertex, targetVertex);
-
-        if (path.Count > defaultMovePoints + 1)
-        {
-            Debug.LogWarning($"Path too long ({path.Count} steps) for {player.name}");
-            return;
-        }
-
-        if (player == Player1)
-        {
-            currentPath = path;
-            StartCoroutine(MovePlayer(Player1, path, () => isMoving = false, pathLine));
-        }
-        else
-        {
-            currentPath2 = path;
-            StartCoroutine(MovePlayer(Player2, path, () => isMoving2 = false, pathLine2));
-        }
-
-        Debug.Log($"{player.name} moving to {targetVertex}");
-    }
+    
 
     private IEnumerator MovePlayer(GameObject player, List<Vector3> path, System.Action onComplete, LineRenderer line)
     {
@@ -1379,18 +1218,6 @@ public class Map1HexGrid : MonoBehaviour
         if (line != null) line.positionCount = 0;
     }
 
-    private void TryDrawPlayerPath()
-    {
-        if (currentPath != null && currentPath.Count >= 2)
-        {
-            DrawPath(currentPath, pathLine, Color.yellow);
-        }
-
-        if (currentPath2 != null && currentPath2.Count >= 2)
-        {
-            DrawPath(currentPath2, pathLine2, Color.cyan);
-        }
-    }
 
     void ClearPathLine(LineRenderer lineRenderer)
     {
@@ -1405,7 +1232,7 @@ public class Map1HexGrid : MonoBehaviour
             showReachableTiles = false;
             ShowReachFromPlayer1();
         }
-        TryDrawPlayerPath();
+       
     }
 
     void OnDestroy()
