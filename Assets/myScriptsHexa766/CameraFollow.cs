@@ -33,6 +33,25 @@ public class CameraFollow : MonoBehaviour
     private Vector3 defaultOffset;
     private float zoomFactor = 1f;
 
+    // Tactical Scanner camera composition
+    private bool tacticalScannerComposition = false;
+
+    [Range(0f, 0.30f)]
+    [SerializeField]
+    private float tacticalScannerScreenShift = 0.16f;
+
+    private Camera cameraComponent;
+
+    [Header("TEMPORARY EVENT FOCUS")]
+    [SerializeField]
+    private float eventFocusZoomMultiplier = 0.65f;
+
+    [SerializeField]
+    private float eventFocusSmoothSpeed = 0.35f;
+
+    private bool eventFocusMode = false;
+    private Vector3 eventFocusPosition;
+    private float eventFocusEndTime = -1f;
     // Delivery camera state
     private bool deliveryMode = false;
 
@@ -48,6 +67,9 @@ public class CameraFollow : MonoBehaviour
     void Awake()
     {
         defaultOffset = offset;
+
+        cameraComponent =
+            GetComponent<Camera>();
     }
 
 
@@ -59,8 +81,11 @@ public class CameraFollow : MonoBehaviour
 
     void Update()
     {
-        // DELIVERY TIMER MUST RUN EVEN WHILE
-        // deliveryMode blocks manual camera input.
+        // =====================================================
+        // DELIVERY TIMER
+        // =====================================================
+        // Must continue running even while deliveryMode
+        // blocks normal camera controls.
         if (pendingDeliveryPlayer != null &&
             pendingDeliveryFinishTime > 0f &&
             Time.unscaledTime >= pendingDeliveryFinishTime)
@@ -79,12 +104,34 @@ public class CameraFollow : MonoBehaviour
             playerToFinish.CompleteAIStationDelivery();
         }
 
-        // During delivery, prevent zoom/orbit/reset input.
-        if (deliveryMode)
-            return;
 
+        // =====================================================
+        // TEMPORARY EVENT FOCUS TIMER
+        // =====================================================
+        // Used by effects such as Team Regroup.
+        if (eventFocusMode &&
+            Time.unscaledTime >= eventFocusEndTime)
+        {
+            EndTemporaryFocus();
+        }
+
+
+        // =====================================================
+        // BLOCK MANUAL CAMERA INPUT DURING SPECIAL FOCUS
+        // =====================================================
+        if (deliveryMode ||
+            eventFocusMode)
+        {
+            return;
+        }
+
+
+        // =====================================================
+        // NORMAL CAMERA CONTROLS
+        // =====================================================
         HandleZoom();
         HandleRotation();
+
 
         if (Input.GetKeyDown(KeyCode.R))
         {
@@ -107,21 +154,47 @@ public class CameraFollow : MonoBehaviour
 
     void FollowTarget()
     {
+        Vector3 focusPosition =
+            eventFocusMode
+            ? eventFocusPosition
+            : target.position;
+
+        Vector3 activeOffset =
+            eventFocusMode
+            ? offset * eventFocusZoomMultiplier
+            : offset;
+
         Vector3 desiredPosition =
-            target.position + offset;
+            focusPosition + activeOffset;
 
-        float speed =
-            deliveryMode
-            ? deliverySmoothSpeed
-            : smoothSpeed;
+        float speed;
 
-        transform.position = Vector3.Lerp(
-            transform.position,
-            desiredPosition,
-            speed
-        );
+        if (deliveryMode)
+        {
+            speed =
+                deliverySmoothSpeed;
+        }
+        else if (eventFocusMode)
+        {
+            speed =
+                eventFocusSmoothSpeed;
+        }
+        else
+        {
+            speed =
+                smoothSpeed;
+        }
 
-        transform.LookAt(target.position);
+        transform.position =
+            Vector3.Lerp(
+                transform.position,
+                desiredPosition,
+                speed
+            );
+
+        transform.LookAt(
+            GetCompositionLookPoint()
+    );
     }
 
 
@@ -171,14 +244,65 @@ public class CameraFollow : MonoBehaviour
     }
 
 
-    public void SetTarget(Transform newTarget)
+    public void SetTarget(
+    Transform newTarget
+)
     {
-        target = newTarget;
+        target =
+            newTarget;
+
+        // During a temporary event focus,
+        // remember the new normal target,
+        // but do not move the camera away yet.
+        if (eventFocusMode)
+            return;
 
         SnapToTarget();
     }
 
+    public void BeginTemporaryFocus(
+    Vector3 worldPosition,
+    float duration
+)
+    {
+        if (deliveryMode)
+            return;
 
+        eventFocusPosition =
+            worldPosition;
+
+        eventFocusEndTime =
+            Time.unscaledTime +
+            Mathf.Max(
+                0.1f,
+                duration
+            );
+
+        eventFocusMode =
+            true;
+
+        Debug.Log(
+            $"[CAMERA] Temporary event focus started at " +
+            $"{worldPosition}"
+        );
+    }
+
+
+    private void EndTemporaryFocus()
+    {
+        if (!eventFocusMode)
+            return;
+
+        eventFocusMode =
+            false;
+
+        eventFocusEndTime =
+            -1f;
+
+        Debug.Log(
+            "[CAMERA] Temporary event focus ended."
+        );
+    }
     public void BeginDeliveryFocus(
         Transform focusTarget
     )
@@ -251,6 +375,106 @@ public class CameraFollow : MonoBehaviour
     }
 
 
+    public void SetTacticalScannerComposition(
+    bool enabled
+)
+    {
+        tacticalScannerComposition =
+            enabled;
+    }
+
+    
+
+    private Vector3 GetCompositionLookPoint()
+    {
+        if (target == null)
+            return transform.position + transform.forward;
+
+
+        // Delivery cinematics keep their normal framing.
+        if (!tacticalScannerComposition ||
+            deliveryMode)
+        {
+            return target.position;
+        }
+
+
+        if (cameraComponent == null)
+        {
+            cameraComponent =
+                GetComponent<Camera>();
+        }
+
+
+        if (cameraComponent == null)
+            return target.position;
+
+
+        Vector3 viewDirection =
+            target.position -
+            transform.position;
+
+
+        if (viewDirection.sqrMagnitude <
+            0.0001f)
+        {
+            return target.position;
+        }
+
+
+        viewDirection.Normalize();
+
+
+        // Horizontal camera-right direction.
+        Vector3 cameraRight =
+            Vector3.Cross(
+                Vector3.up,
+                viewDirection
+            ).normalized;
+
+
+        if (cameraRight.sqrMagnitude <
+            0.0001f)
+        {
+            cameraRight =
+                transform.right;
+        }
+
+
+        float distance =
+            offset.magnitude;
+
+
+        float halfVerticalView =
+            Mathf.Tan(
+                cameraComponent.fieldOfView *
+                0.5f *
+                Mathf.Deg2Rad
+            ) *
+            distance;
+
+
+        float halfHorizontalView =
+            halfVerticalView *
+            cameraComponent.aspect;
+
+
+        // Convert the desired screen-space displacement
+        // into a world-space look offset.
+        float worldShift =
+            halfHorizontalView *
+            tacticalScannerScreenShift *
+            2f;
+
+
+        // Look slightly RIGHT of the actual target.
+        // The real target therefore appears LEFT on screen,
+        // away from the Tactical Scanner.
+        return
+            target.position +
+            cameraRight *
+            worldShift;
+    }
     void SnapToTarget()
     {
         if (target == null)

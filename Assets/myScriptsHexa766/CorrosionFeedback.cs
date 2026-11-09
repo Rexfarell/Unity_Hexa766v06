@@ -59,7 +59,55 @@ public class CorrosionFeedback : MonoBehaviour
     [SerializeField]
     private float fragmentRadius = 0.40f;
 
+    [Header("NETWORK IMPULSE AUDIO")]
 
+    [SerializeField]
+    private AudioClip chargeClip;
+
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float chargeVolume = 0.65f;
+
+    [SerializeField]
+    private AudioClip impactClip;
+
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float impactVolume = 0.9f;
+
+    private AudioSource networkImpulseAudioSource;
+
+    private void Awake()
+    {
+        networkImpulseAudioSource =
+            gameObject.AddComponent<AudioSource>();
+
+        networkImpulseAudioSource.playOnAwake =
+            false;
+
+        networkImpulseAudioSource.loop =
+            false;
+
+        networkImpulseAudioSource.spatialBlend =
+            0f;
+    }
+
+    private void PlayNetworkImpulseSound(
+    AudioClip clip,
+    float volume
+)
+    {
+        if (networkImpulseAudioSource == null ||
+            clip == null)
+        {
+            return;
+        }
+
+        networkImpulseAudioSource.PlayOneShot(
+            clip,
+            volume
+        );
+    }
     public void Play(
         int shieldLost,
         int energyLost
@@ -266,6 +314,10 @@ public class CorrosionFeedback : MonoBehaviour
         Material material
     )
     {
+        PlayNetworkImpulseSound(
+    chargeClip,
+    chargeVolume
+);
         GameObject lightObject =
             new GameObject(
                 "PyramidChargeLight"

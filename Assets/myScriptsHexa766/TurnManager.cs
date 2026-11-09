@@ -748,6 +748,101 @@ public class TurnManager : MonoBehaviour
         return true;
     }
 
+    public bool TryAIAttack(
+    PlayerUnit attacker,
+    PlayerUnit target
+)
+    {
+        if (attacker == null ||
+            target == null)
+        {
+            return false;
+        }
+
+        if (current != attacker)
+            return false;
+
+        if (isProcessingMove)
+            return false;
+
+        if (attacker.IsDead ||
+            target.IsDead)
+        {
+            return false;
+        }
+
+        if (!target.gameObject.activeInHierarchy)
+            return false;
+
+        if (attacker.teamID ==
+            target.teamID)
+        {
+            return false;
+        }
+
+
+        if (map == null)
+        {
+            map =
+                FindFirstObjectByType<Map1HexGrid>();
+        }
+
+        if (map == null)
+            return false;
+
+
+        bool sameHex =
+            attacker.currentTileCoord ==
+            target.currentTileCoord;
+
+
+        List<Vector2Int> adjacentTiles =
+            map.GetAdjacentTileCoords(
+                attacker.currentTileCoord
+            );
+
+
+        bool adjacentHex =
+            adjacentTiles.Contains(
+                target.currentTileCoord
+            );
+
+
+        if (!sameHex &&
+            !adjacentHex)
+        {
+            return false;
+        }
+
+
+        pendingAttackTargets.Clear();
+
+        pendingAttackTargets.Add(
+            target
+        );
+
+        selectedAttackTarget =
+            target;
+
+        isSelectingAdjacentAttack =
+            false;
+
+        isProcessingMove =
+            true;
+
+
+        Debug.Log(
+            $"[ENEMY AI ATTACK] " +
+            $"{attacker.name} → {target.name} | " +
+            $"SameHex={sameHex} | " +
+            $"Adjacent={adjacentHex}"
+        );
+
+
+        attacker.Attack();
+
+        return true;
+    }
     public void HandleAttackImpact()
     {
         if (current == null)

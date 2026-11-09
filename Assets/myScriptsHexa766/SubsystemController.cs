@@ -5,9 +5,17 @@ public class SubsystemController : MonoBehaviour
     private Camera gameplayCamera;
     private EnemyDroneDirector enemyDroneDirector;
 
+    private TopologyScanner topologyScanner;
+
+    private TopologyScanHUD topologyScanHUD;
+
     private PlayerUnit lastTurnUnit;
     private bool subsystemUsedThisTurn = false;
 
+    private SubsystemController subsystemController;
+
+    public bool SubsystemUsedThisTurn =>
+    subsystemUsedThisTurn;
 
     private void Start()
     {
@@ -21,7 +29,26 @@ public class SubsystemController : MonoBehaviour
 
         enemyDroneDirector =
             FindFirstObjectByType<EnemyDroneDirector>();
+
+        topologyScanner =
+    GetComponent<TopologyScanner>();
+
+        if (topologyScanner == null)
+        {
+            topologyScanner =
+                FindFirstObjectByType<TopologyScanner>();
+        }
+
+        topologyScanHUD =
+    GetComponent<TopologyScanHUD>();
+
+        if (topologyScanHUD == null)
+        {
+            topologyScanHUD =
+                FindFirstObjectByType<TopologyScanHUD>();
+        }
     }
+
 
 
     private void Update()
@@ -37,6 +64,7 @@ public class SubsystemController : MonoBehaviour
 
         if (activeUnit == null)
             return;
+
 
         // ---------------------------------------------
         // NEW PLAYER TURN
@@ -54,6 +82,7 @@ public class SubsystemController : MonoBehaviour
             );
         }
 
+
         // No player Subsystems during Enemy Phase.
         if (enemyDroneDirector != null &&
             enemyDroneDirector.IsRunning)
@@ -67,7 +96,24 @@ public class SubsystemController : MonoBehaviour
         if (activeUnit.IsMoving)
             return;
 
-        // One successful Subsystem per unit turn.
+
+        // ---------------------------------------------
+        // 5 — TOPOLOGY SCAN
+        // Free analysis interface.
+        // Does NOT consume the intervention opportunity.
+        // ---------------------------------------------
+        if (Input.GetKeyDown(KeyCode.Alpha5))
+        {
+            TryTopologyScan(
+                activeUnit
+            );
+
+            return;
+        }
+
+
+        // One successful INTERVENTION per unit turn.
+        // Tactical Scanner remains available above.
         if (subsystemUsedThisTurn)
             return;
 
@@ -123,6 +169,8 @@ public class SubsystemController : MonoBehaviour
             TryNetworkStress(
                 activeUnit
             );
+
+            return;
         }
     }
 
@@ -400,7 +448,450 @@ public class SubsystemController : MonoBehaviour
         );
     }
 
+    public bool TryStructuralReinforcementOnHex(
+    HexCapacity target
+    )
+    {
+        TurnManager turnManager =
+            TurnManager.Instance;
 
+        if (turnManager == null)
+            return false;
+
+        PlayerUnit activeUnit =
+            turnManager.current;
+
+        if (activeUnit == null)
+            return false;
+
+
+        // Keep the subsystem turn state synchronized.
+        if (activeUnit != lastTurnUnit)
+        {
+            lastTurnUnit =
+                activeUnit;
+
+            subsystemUsedThisTurn =
+                false;
+        }
+
+
+        if (enemyDroneDirector == null)
+        {
+            enemyDroneDirector =
+                FindFirstObjectByType<EnemyDroneDirector>();
+        }
+
+        if (enemyDroneDirector != null &&
+            enemyDroneDirector.IsRunning)
+        {
+            return false;
+        }
+
+        if (activeUnit.IsDead)
+            return false;
+
+        if (activeUnit.IsMoving)
+            return false;
+
+        if (subsystemUsedThisTurn)
+            return false;
+
+        if (target == null)
+            return false;
+
+        if (target.IsCollapsed ||
+            target.IsCollapseSequenceRunning)
+        {
+            return false;
+        }
+
+
+        int capacityBefore =
+            target.EffectiveCapacity;
+
+        bool applied =
+            target.ApplyCapacityModifier(
+                +3
+            );
+
+        if (!applied)
+            return false;
+
+
+        int actualIncrease =
+            target.EffectiveCapacity -
+            capacityBefore;
+
+        subsystemUsedThisTurn =
+            true;
+
+
+        Debug.Log(
+            $"[SUBSYSTEM] STRUCTURAL REINFORCEMENT FROM SCANNER | " +
+            $"{activeUnit.name} → {target.name} | " +
+            $"Capacity={capacityBefore} → {target.EffectiveCapacity}"
+        );
+
+
+        ShowHexSubsystemFeedback(
+            "STRUCTURAL REINFORCEMENT",
+            $"STRUCTURAL CAPACITY  +{actualIncrease}",
+            target
+        );
+
+
+        return true;
+    }
+
+    public bool TryNetworkStressOnHex(
+    HexCapacity target
+    )
+    {
+        TurnManager turnManager =
+            TurnManager.Instance;
+
+        if (turnManager == null)
+            return false;
+
+        PlayerUnit activeUnit =
+            turnManager.current;
+
+        if (activeUnit == null)
+            return false;
+
+
+        // Keep turn tracking synchronized even when
+        // execution comes from the Tactical Scanner.
+        if (activeUnit != lastTurnUnit)
+        {
+            lastTurnUnit =
+                activeUnit;
+
+            subsystemUsedThisTurn =
+                false;
+        }
+
+
+        if (enemyDroneDirector != null &&
+            enemyDroneDirector.IsRunning)
+        {
+            return false;
+        }
+
+        if (activeUnit.IsDead)
+            return false;
+
+        if (activeUnit.IsMoving)
+            return false;
+
+        if (subsystemUsedThisTurn)
+            return false;
+
+        if (target == null)
+            return false;
+
+        if (target.IsCollapsed ||
+            target.IsCollapseSequenceRunning)
+        {
+            return false;
+        }
+
+
+        int capacityBefore =
+            target.EffectiveCapacity;
+
+        bool applied =
+            target.ApplyCapacityModifier(
+                -3
+            );
+
+        if (!applied)
+        {
+            Debug.Log(
+                $"[SUBSYSTEM] NETWORK STRESS had no effect " +
+                $"on {target.name}."
+            );
+
+            return false;
+        }
+
+
+        int actualReduction =
+            capacityBefore -
+            target.EffectiveCapacity;
+
+        subsystemUsedThisTurn =
+            true;
+
+
+        Debug.Log(
+            $"[SUBSYSTEM] NETWORK STRESS | " +
+            $"{activeUnit.name} → {target.name} | " +
+            $"Capacity={capacityBefore} → {target.EffectiveCapacity} | " +
+            $"Load={target.CurrentLoad}"
+        );
+
+
+        ShowHexSubsystemFeedback(
+            "NETWORK STRESS",
+            $"STRUCTURAL CAPACITY  -{actualReduction}",
+            target
+        );
+
+        return true;
+    }
+
+
+    public bool TryMassDampenerOnUnit(
+    PlayerUnit target
+)
+    {
+        TurnManager turnManager =
+            TurnManager.Instance;
+
+        if (turnManager == null)
+            return false;
+
+        PlayerUnit activeUnit =
+            turnManager.current;
+
+        if (activeUnit == null)
+            return false;
+
+
+        // Keep turn tracking synchronized when the
+        // command originates from the Tactical Scanner.
+        if (activeUnit != lastTurnUnit)
+        {
+            lastTurnUnit =
+                activeUnit;
+
+            subsystemUsedThisTurn =
+                false;
+        }
+
+
+        if (enemyDroneDirector != null &&
+            enemyDroneDirector.IsRunning)
+        {
+            return false;
+        }
+
+        if (activeUnit.IsDead)
+            return false;
+
+        if (activeUnit.IsMoving)
+            return false;
+
+        if (subsystemUsedThisTurn)
+            return false;
+
+        if (target == null)
+            return false;
+
+        if (target.IsDead)
+            return false;
+
+        if (!target.gameObject.activeInHierarchy)
+            return false;
+
+
+        // MASS DAMPENER may only affect an allied unit.
+        if (target.teamID !=
+            activeUnit.teamID)
+        {
+            Debug.Log(
+                "[SUBSYSTEM] MASS DAMPENER rejected — " +
+                "target is not allied."
+            );
+
+            return false;
+        }
+
+
+        // Effective Load cannot be reduced below 1.
+        if (target.EffectiveLoad <= 1)
+        {
+            Debug.Log(
+                $"[SUBSYSTEM] MASS DAMPENER unavailable — " +
+                $"{target.name} is already at minimum Effective Load."
+            );
+
+            return false;
+        }
+
+
+        int loadBefore =
+            target.EffectiveLoad;
+
+
+        bool applied =
+            target.ApplyLoadModifier(
+                -1
+            );
+
+        if (!applied)
+        {
+            Debug.Log(
+                $"[SUBSYSTEM] MASS DAMPENER had no effect on " +
+                $"{target.name}."
+            );
+
+            return false;
+        }
+
+
+        int actualReduction =
+            loadBefore -
+            target.EffectiveLoad;
+
+
+        subsystemUsedThisTurn =
+            true;
+
+
+        Debug.Log(
+            $"[SUBSYSTEM] MASS DAMPENER | " +
+            $"{activeUnit.name} → {target.name} | " +
+            $"EffectiveLoad={loadBefore} → {target.EffectiveLoad}"
+        );
+
+
+        ShowUnitSubsystemFeedback(
+            "MASS DAMPENER",
+            $"EFFECTIVE LOAD  -{actualReduction}  →  {target.EffectiveLoad}",
+            target
+        );
+
+
+        return true;
+    }
+
+    public bool TryBallastInjectionOnUnit(
+    PlayerUnit target
+)
+    {
+        TurnManager turnManager =
+            TurnManager.Instance;
+
+        if (turnManager == null)
+            return false;
+
+        PlayerUnit activeUnit =
+            turnManager.current;
+
+        if (activeUnit == null)
+            return false;
+
+
+        // Keep turn tracking synchronized when the
+        // command originates from the Tactical Scanner.
+        if (activeUnit != lastTurnUnit)
+        {
+            lastTurnUnit =
+                activeUnit;
+
+            subsystemUsedThisTurn =
+                false;
+        }
+
+
+        if (enemyDroneDirector != null &&
+            enemyDroneDirector.IsRunning)
+        {
+            return false;
+        }
+
+        if (activeUnit.IsDead)
+            return false;
+
+        if (activeUnit.IsMoving)
+            return false;
+
+        if (subsystemUsedThisTurn)
+            return false;
+
+        if (target == null)
+            return false;
+
+        if (target.IsDead)
+            return false;
+
+        if (!target.gameObject.activeInHierarchy)
+            return false;
+
+
+        // BALLAST INJECTION may only affect an enemy unit.
+        if (target.teamID ==
+            activeUnit.teamID)
+        {
+            Debug.Log(
+                "[SUBSYSTEM] BALLAST INJECTION rejected — " +
+                "target is not an enemy."
+            );
+
+            return false;
+        }
+
+
+        // Effective Load cannot be increased above 5.
+        if (target.EffectiveLoad >= 5)
+        {
+            Debug.Log(
+                $"[SUBSYSTEM] BALLAST INJECTION unavailable — " +
+                $"{target.name} is already at maximum Effective Load."
+            );
+
+            return false;
+        }
+
+
+        int loadBefore =
+            target.EffectiveLoad;
+
+
+        bool applied =
+            target.ApplyLoadModifier(
+                +1
+            );
+
+        if (!applied)
+        {
+            Debug.Log(
+                $"[SUBSYSTEM] BALLAST INJECTION had no effect on " +
+                $"{target.name}."
+            );
+
+            return false;
+        }
+
+
+        int actualIncrease =
+            target.EffectiveLoad -
+            loadBefore;
+
+
+        subsystemUsedThisTurn =
+            true;
+
+
+        Debug.Log(
+            $"[SUBSYSTEM] BALLAST INJECTION | " +
+            $"{activeUnit.name} → {target.name} | " +
+            $"EffectiveLoad={loadBefore} → {target.EffectiveLoad}"
+        );
+
+
+        ShowUnitSubsystemFeedback(
+            "BALLAST INJECTION",
+            $"EFFECTIVE LOAD  +{actualIncrease}  →  {target.EffectiveLoad}",
+            target
+        );
+
+
+        return true;
+    }
     // =================================================
     // NETWORK STRESS
     // =================================================
@@ -459,7 +950,57 @@ public class SubsystemController : MonoBehaviour
         );
     }
 
+    // =================================================
+    // TOPOLOGY SCAN
+    // =================================================
 
+    private void TryTopologyScan(
+     PlayerUnit activeUnit
+ )
+    {
+        if (topologyScanner == null)
+        {
+            Debug.LogWarning(
+                "[SUBSYSTEM] TOPOLOGY SCAN unavailable — " +
+                "TopologyScanner not found."
+            );
+
+            return;
+        }
+
+        bool scanSucceeded =
+            topologyScanner.RunScan();
+
+        if (!scanSucceeded)
+        {
+            return;
+        }
+
+        // Tactical Scanner is an analysis interface.
+        // Opening/running it does NOT consume the
+        // unit's subsystem intervention opportunity.
+
+        if (topologyScanHUD != null)
+        {
+            topologyScanHUD.Show(
+                topologyScanner
+            );
+        }
+
+        Debug.Log(
+            $"[SUBSYSTEM] TOPOLOGY SCAN | " +
+            $"{activeUnit.name} completed network analysis."
+        );
+
+        if (SubsystemFeedbackUI.Instance != null)
+        {
+            SubsystemFeedbackUI.Instance.ShowMessage(
+                "<b><size=110%>HEXA_766 // TOPOLOGY SCAN</size></b>\n" +
+                "<b>NETWORK ANALYSIS COMPLETE</b>\n" +
+                "CRITICAL NODE DATA ACQUIRED"
+            );
+        }
+    }
     // =================================================
     // TARGETING
     // =================================================

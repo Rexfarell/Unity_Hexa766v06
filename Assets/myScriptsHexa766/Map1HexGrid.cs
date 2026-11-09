@@ -855,7 +855,7 @@ public class Map1HexGrid : MonoBehaviour
         aPlayerToVertex(Player2, p2TileName, player2VertexIndex);
     }
     [Header("SOUND")]
-    [SerializeField] public AudioClip cyberBurstSound;
+    [SerializeField] public AudioClip MechanicalSteps;
     [SerializeField]
     private bool soundMuted = false;
 
@@ -864,13 +864,13 @@ public class Map1HexGrid : MonoBehaviour
         if (soundMuted)
             return;
 
-        if (cyberBurstSound != null)
+        if (MechanicalSteps != null)
         {
-            AudioSource.PlayClipAtPoint(cyberBurstSound, position, 0.7f);
+            AudioSource.PlayClipAtPoint(MechanicalSteps, position, 0.7f);
         }
         else
         {
-            Debug.LogWarning("[SOUND] CyberBurst clip missing!");
+            Debug.LogWarning("[SOUND] MechanicalSteps clip missing!");
         }
     }
 

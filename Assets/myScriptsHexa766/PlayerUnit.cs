@@ -13,6 +13,43 @@ public class PlayerUnit : MonoBehaviour
 
     public int unitID = 1;   // 1-4 within the team
 
+    public string UnitCode
+    {
+        get
+        {
+            string prefix;
+
+            if (teamID == 1)
+                prefix = "B";
+            else if (teamID == 2)
+                prefix = "R";
+            else
+                prefix = "U";
+
+
+            int displayIndex =
+                Mathf.Clamp(
+                    unitID - 1,
+                    0,
+                    3
+                );
+
+
+            string binaryCode =
+                System.Convert.ToString(
+                    displayIndex,
+                    2
+                ).PadLeft(
+                    2,
+                    '0'
+                );
+
+
+            return
+                $"{prefix}{binaryCode}";
+        }
+    }
+
     [Header("MASS / LOAD")]
 
     [Min(1)]
@@ -69,6 +106,41 @@ public class PlayerUnit : MonoBehaviour
 
     public int energy = 100;
     public int shield = 100;
+
+    public int MaxEnergy { get; private set; }
+    public int MaxShield { get; private set; }
+
+    public int MaxDurability =>
+        MaxEnergy +
+        MaxShield;
+
+    public int CurrentDurability =>
+        Mathf.Max(0, energy) +
+        Mathf.Max(0, shield);
+
+    public float EnergyRatio =>
+        MaxEnergy > 0
+            ? Mathf.Clamp01(
+                (float)energy /
+                MaxEnergy
+            )
+            : 0f;
+
+    public float ShieldRatio =>
+        MaxShield > 0
+            ? Mathf.Clamp01(
+                (float)shield /
+                MaxShield
+            )
+            : 0f;
+
+    public float DurabilityRatio =>
+        MaxDurability > 0
+            ? Mathf.Clamp01(
+                (float)CurrentDurability /
+                MaxDurability
+            )
+            : 0f;
 
     public bool IsDead => isDead;
     public bool IsMoving => isMoving;
@@ -196,6 +268,24 @@ public class PlayerUnit : MonoBehaviour
 
     void Start()
     {
+        MaxEnergy =
+    Mathf.Max(
+        0,
+        energy
+    );
+
+        MaxShield =
+            Mathf.Max(
+                0,
+                shield
+            );
+
+        Debug.Log(
+            $"[UNIT STATS] {name} | " +
+            $"MaxShield={MaxShield} | " +
+            $"MaxEnergy={MaxEnergy} | " +
+            $"MaxDurability={MaxDurability}"
+        );
         map = FindObjectOfType<Map1HexGrid>();
         turnManager = FindObjectOfType<TurnManager>();
 
@@ -322,6 +412,40 @@ public class PlayerUnit : MonoBehaviour
         }
     }
 
+    // =====================================================
+    // TACTICAL SCANNER — TOPOLOGICAL MOVEMENT TELEMETRY
+    // =====================================================
+
+    public string TopologySettledTile
+    {
+        get;
+        private set;
+    }
+
+    public string TopologyFromTile
+    {
+        get;
+        private set;
+    }
+
+    public string TopologyToTile
+    {
+        get;
+        private set;
+    }
+
+    public float TopologySegmentProgress
+    {
+        get;
+        private set;
+    }
+
+    public bool HasTopologySegment
+    {
+        get;
+        private set;
+    }
+
 
     public bool IsValidMove(Vector2Int tile, int v)
     {
@@ -393,30 +517,177 @@ public class PlayerUnit : MonoBehaviour
         }
 
         // Start walking animation
+        // Start walking animation
         if (animator != null)
             animator.SetBool("Walking", true);
 
+
+        // =====================================================
+        // TACTICAL SCANNER — INITIAL TOPOLOGICAL POSITION
+        // =====================================================
+
+        var topologyStart =
+            map.GetPlayerTileAndVertex(
+                gameObject
+            );
+
+        string previousTopologyTile =
+            topologyStart.tileName;
+
+        TopologySettledTile =
+            previousTopologyTile;
+
+        TopologyFromTile =
+            previousTopologyTile;
+
+        TopologyToTile =
+            previousTopologyTile;
+
+        TopologySegmentProgress =
+            0f;
+
+        HasTopologySegment =
+            false;
+
+
+        // =====================================================
+        // MOVEMENT PATH
+        // =====================================================
+
         foreach (var step in path)
         {
-            Vector3 targetPos = map.GetVertexPosition(step.tileName, step.vertexIndex);
+            Vector3 segmentStartPosition =
+                transform.position;
 
-            while (Vector3.Distance(transform.position, targetPos) > 0.01f)
-            {
-                transform.position = Vector3.MoveTowards(
-                    transform.position,
-                    targetPos,
-                    moveSpeed * Time.deltaTime
+            Vector3 targetPos =
+                map.GetVertexPosition(
+                    step.tileName,
+                    step.vertexIndex
                 );
+
+
+            float segmentDistance =
+                Vector3.Distance(
+                    segmentStartPosition,
+                    targetPos
+                );
+
+
+            bool changesTopology =
+                !string.IsNullOrEmpty(
+                    previousTopologyTile
+                ) &&
+                previousTopologyTile !=
+                step.tileName;
+
+
+            TopologyFromTile =
+                previousTopologyTile;
+
+            TopologyToTile =
+                step.tileName;
+
+            TopologySegmentProgress =
+                0f;
+
+            HasTopologySegment =
+                changesTopology;
+
+
+            while (
+                Vector3.Distance(
+                    transform.position,
+                    targetPos
+                ) > 0.01f
+            )
+            {
+                transform.position =
+                    Vector3.MoveTowards(
+                        transform.position,
+                        targetPos,
+                        moveSpeed *
+                        Time.deltaTime
+                    );
+
+
+                if (changesTopology &&
+                    segmentDistance > 0.0001f)
+                {
+                    float remainingDistance =
+                        Vector3.Distance(
+                            transform.position,
+                            targetPos
+                        );
+
+                    TopologySegmentProgress =
+                        Mathf.Clamp01(
+                            1f -
+                            (
+                                remainingDistance /
+                                segmentDistance
+                            )
+                        );
+                }
+
 
                 yield return null;
             }
 
-            transform.position = targetPos;
+
+            transform.position =
+                targetPos;
+
+
+            if (changesTopology)
+            {
+                TopologySegmentProgress =
+                    1f;
+            }
+
 
             // Update logical position as each vertex is reached.
-            currentTileCoord = map.GetTileGridCoord(step.tileName);
-            currentVertexIndex = step.vertexIndex;
+            currentTileCoord =
+                map.GetTileGridCoord(
+                    step.tileName
+                );
+
+            currentVertexIndex =
+                step.vertexIndex;
+
+
+            TopologySettledTile =
+                step.tileName;
+
+            previousTopologyTile =
+                step.tileName;
+
+
+            HasTopologySegment =
+                false;
+
+            TopologyFromTile =
+                TopologySettledTile;
+
+            TopologyToTile =
+                TopologySettledTile;
+
+            TopologySegmentProgress =
+                0f;
         }
+
+
+        // Movement has finished on a stable topology node.
+        HasTopologySegment =
+            false;
+
+        TopologyFromTile =
+            TopologySettledTile;
+
+        TopologyToTile =
+            TopologySettledTile;
+
+        TopologySegmentProgress =
+            0f;
 
         Debug.Log(
             $"[MOVE OCCUPANCY FINAL] {name} FINAL = " +
@@ -1001,9 +1272,12 @@ public class PlayerUnit : MonoBehaviour
             $"[{name}] Respawn timer END at {Time.time:F2}"
         );
 
-        // Restore stats
-        energy = 100;
-        shield = 100;
+        // Restore the unit to its configured maximum stats.
+        energy =
+            MaxEnergy;
+
+        shield =
+            MaxShield;
 
         // Hide carried box visual after respawn
         if (carriedBox != null)
@@ -1134,6 +1408,28 @@ public class PlayerUnit : MonoBehaviour
         return (shieldLost, energyLost);
     }
 
+    public bool RestoreShieldToFull()
+    {
+        if (isDead)
+            return false;
+
+        if (shield >= 100)
+            return false;
+
+        int before =
+            shield;
+
+        shield = 100;
+
+        UpdateHealthBars();
+
+        Debug.Log(
+            $"[TEAM REGROUP] {name} shield restored | " +
+            $"{before} → {shield}"
+        );
+
+        return true;
+    }
     public void TakeEnvironmentalDamage(int amount)
     {
         if (amount <= 0)
@@ -1219,7 +1515,8 @@ public class PlayerUnit : MonoBehaviour
         {
             Debug.Log($"Shield Root = {shieldBar.root.name}");
             Debug.Log($"Shield Scale BEFORE = {shieldBar.localScale}");
-            float shieldPercent = Mathf.Clamp01(shield / 100f);
+            float shieldPercent =
+                ShieldRatio;
 
             Vector3 scale = shieldBar.localScale;
             scale.x = shieldBarFullWidth * shieldPercent;
@@ -1235,7 +1532,8 @@ public class PlayerUnit : MonoBehaviour
         {
             Debug.Log($"Energy Root = {energyBar.root.name}");
             Debug.Log($"Energy Scale BEFORE = {energyBar.localScale}");
-            float energyPercent = Mathf.Clamp01(energy / 100f);
+            float energyPercent =
+                EnergyRatio;
 
             Vector3 scale = energyBar.localScale;
             Debug.Log($"Energy Scale AFTER = {energyBar.localScale}");
