@@ -1,0 +1,342 @@
+using System.Collections;
+using TMPro;
+using UnityEngine;
+using UnityEngine;
+using UnityEngine.UI;
+public class MissionIntro : MonoBehaviour
+{
+
+
+    [Header("Intro Panels")]
+    public GameObject logoPanel;
+    public GameObject storyPanel;
+    public GameObject missionPanel;
+
+    [Header("Timing")]
+    public float moveDuration = 2f;
+
+    [Header("Camera")]
+    public CameraFollow cameraFollow;
+
+    [Header("Targets")]
+
+    [Header("Gameplay")]
+    public TurnManager turnManager;
+
+    [Header("Audio")]
+    public AudioSource introMusic;
+
+    [Header("UI")]
+    public TMP_Text skipCaption;
+
+    public Transform overviewPoint;
+
+    public Transform overviewTarget;
+
+    public Transform pyramidPoint;
+    public Transform aiStationPoint;
+    public Transform player1Point;
+    public Transform player2Point;
+
+    public Transform pyramid;
+    public Transform aiStation;
+    public Transform player1;
+    public Transform player2;
+
+    private Coroutine introCoroutine;
+    private bool introSkipped = false;
+
+
+    public float pauseDuration = 1.5f;
+
+    void Start()
+    {
+        Debug.Log("===== MISSION INTRO STARTED =====");
+
+        if (cameraFollow != null)
+            cameraFollow.enabled = false;
+        if (introMusic != null)
+            introMusic.Play();
+
+        introCoroutine = StartCoroutine(IntroSequence());
+    }
+
+    IEnumerator IntroSequence()
+    {
+
+        // ------------------------------
+        // ARCHIVE 766
+        // ------------------------------
+
+        yield return ShowPanel(logoPanel, 3f);
+
+        yield return MoveCamera(
+            overviewPoint,
+            overviewTarget,
+            6f);
+
+        // Curator narration (Briefing)
+        TMP_Text story = storyPanel.GetComponentInChildren<TMP_Text>();
+        CanvasGroup storyGroup = GetGroup(storyPanel);
+
+        storyPanel.SetActive(true);
+
+        story.text =
+            "Recovered Archive No. 766\n\n" +
+            "loading...";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(2f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "YEAR 2268";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(2f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "Humanity uncovers\n" +
+            "the remains of an extraterrestrial\n" +
+            "civilization.";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(3f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "Hidden beyond the Holographic Cenotaph\n" +
+            "lies something older than recorded history:ARCHON";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(3f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "The most advanced non-human artificial intelligence ever discovered.";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(2f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        story.text =
+            "Recovered records indicate\n" +
+            "that multiple expeditions\n" +
+            "converged upon the monument\n" +
+            "shortly after its discovery.";
+        yield return Fade(storyGroup, 0f, 1f, 0.6f);
+        yield return new WaitForSeconds(4f);
+        yield return Fade(storyGroup, 1f, 0f, 0.6f);
+
+        storyPanel.SetActive(false);
+
+        yield return ShowPanel(missionPanel, 4f);
+
+        yield return new WaitForSeconds(pauseDuration);
+
+        yield return OrbitToTarget(
+            pyramidPoint,//where the camera should end.
+            pyramid,//what the camera should look at.
+            4f,
+            35f);
+
+        yield return new WaitForSeconds(pauseDuration);
+
+        yield return OrbitToTarget(
+            aiStationPoint,
+            aiStation,
+            5f,
+            25f);
+
+        yield return new WaitForSeconds(pauseDuration);
+
+        yield return OrbitToTarget(
+            player1Point,
+            player1,
+            5f,
+            12f);
+
+        yield return new WaitForSeconds(1.5f);
+
+        yield return OrbitToTarget(
+            player2Point,
+            player2,
+            5f,
+            12f);
+
+        yield return new WaitForSeconds(0.5f);
+
+        FinishIntro();
+    }
+
+    IEnumerator MoveCamera(Transform viewPoint, Transform lookTarget, float duration)
+    {
+        Vector3 startPos = Camera.main.transform.position;
+        Quaternion startRot = Camera.main.transform.rotation;
+
+        Vector3 endPos = viewPoint.position;
+        Quaternion endRot =
+            Quaternion.LookRotation(
+                lookTarget.position - endPos,
+                Vector3.up);
+
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            float t = elapsed / duration;
+
+            float s = t * t * (3f - 2f * t);
+
+            Camera.main.transform.position =
+                Vector3.Lerp(startPos, endPos, s);
+
+            Camera.main.transform.rotation =
+                Quaternion.Slerp(startRot, endRot, s);
+
+            elapsed += Time.deltaTime;
+
+            yield return null;
+        }
+
+        Camera.main.transform.position = endPos;
+        Camera.main.transform.rotation = endRot;
+    }
+
+    IEnumerator OrbitToTarget(Transform viewPoint, Transform lookTarget, float duration, float orbitAngle = 35f)
+    {
+        Debug.Log($"[Orbit] ViewPoint = {viewPoint.name}");
+        Debug.Log($"[Orbit] Position = {viewPoint.position}");
+        Vector3 startPos = Camera.main.transform.position;
+        Quaternion startRot = Camera.main.transform.rotation;
+
+        Vector3 center = lookTarget.position;
+
+        // Final camera position
+        Vector3 endPos = viewPoint.position;
+
+        // Build an arc around the target
+        Vector3 startDir = (startPos - center).normalized;
+        Vector3 endDir = (endPos - center).normalized;
+
+        float startRadius = Vector3.Distance(startPos, center);
+        float endRadius = Vector3.Distance(endPos, center);
+
+        float elapsed = 0f;
+
+        Debug.Log($"Angle = {Vector3.Angle(startDir, endDir)}");
+        while (elapsed < duration)
+        {
+            float t = elapsed / duration;
+
+            // Smooth ease in/out
+            float s = t * t * (3f - 2f * t);
+
+            Quaternion rot =
+                Quaternion.AngleAxis(
+                    Mathf.Lerp(orbitAngle, 0f, s),
+                    Vector3.up);
+
+            Vector3 dir =
+                Vector3.Slerp(
+                    rot * startDir,
+                    endDir,
+                    s);
+
+            float radius =
+                Mathf.Lerp(startRadius, endRadius, s);
+
+            Camera.main.transform.position =
+                center + dir * radius;
+
+            Camera.main.transform.LookAt(lookTarget.position);
+
+            elapsed += Time.deltaTime;
+
+            yield return null;
+        }
+
+        Camera.main.transform.position = endPos;
+        Camera.main.transform.LookAt(lookTarget.position);
+    }
+
+    void Update()
+    {
+        if (introSkipped)
+            return;
+
+        if (Input.GetKeyDown(KeyCode.Return) ||
+            Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            Debug.Log("[INTRO] Skipped by player.");
+
+            introSkipped = true;
+
+            if (introCoroutine != null)
+                StopCoroutine(introCoroutine);
+
+            FinishIntro();
+        }
+    }
+
+    void FinishIntro()
+    {
+        if (skipCaption != null)
+            Destroy(skipCaption.gameObject);
+
+        if (cameraFollow != null && player1 != null)
+        {
+            cameraFollow.SetTarget(player1);
+            cameraFollow.enabled = true;
+        }
+
+        if (turnManager != null)
+            if (introMusic != null)
+                introMusic.Stop();
+         turnManager.BeginMatch();
+           
+
+        Destroy(this);
+    }
+
+    CanvasGroup GetGroup(GameObject panel)
+    {
+        return panel.GetComponent<CanvasGroup>();
+    }
+
+    IEnumerator Fade(CanvasGroup group, float from, float to, float duration)
+    {
+        group.alpha = from;
+
+        float t = 0f;
+
+        while (t < duration)
+        {
+            group.alpha = Mathf.Lerp(from, to, t / duration);
+
+            t += Time.deltaTime;
+
+            yield return null;
+        }
+
+        group.alpha = to;
+    }
+
+    IEnumerator ShowPanel(GameObject panel, float holdTime)
+    {
+        CanvasGroup g = GetGroup(panel);
+
+        panel.SetActive(true);
+
+        // Force Unity to rebuild the UI immediately
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(
+            panel.GetComponent<RectTransform>());
+
+        yield return null;   // Wait one frame so TMP finishes generating the text
+
+        yield return Fade(g, 0f, 1f, 0.75f);
+
+        yield return new WaitForSeconds(holdTime);
+
+        yield return Fade(g, 1f, 0f, 0.75f);
+
+        panel.SetActive(false);
+    }
+}

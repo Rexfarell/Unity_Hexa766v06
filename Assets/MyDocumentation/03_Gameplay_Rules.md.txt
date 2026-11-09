@@ -1,0 +1,117 @@
+# Gameplay Rules
+
+---
+
+**Document Version:** 0.1
+
+**Last Updated:** 2026-01-08
+
+---
+
+# Purpose
+
+This document describes the gameplay mechanics of HEXA_766 independently of the source code.
+
+---
+
+# Objective
+
+Each player controls a robotic unit on a procedurally generated hexagonal battlefield.
+
+Players must navigate hazards, manipulate objects, and complete mission objectives while preserving their unit.
+
+---
+
+# Turn Structure
+
+Each turn follows this sequence:
+
+1. Current player becomes active.
+2. Valid movement locations are highlighted.
+3. Player selects a destination.
+4. Unit moves.
+5. Environmental hazards are resolved.
+6. Camera changes to the next player.
+7. Turn ends.
+
+---
+
+# Movement
+
+Movement is vertex-based.
+
+The board is generated procedurally.
+
+Movement destinations are generated dynamically every turn.
+
+---
+
+# Health System
+
+Each unit has:
+
+- Shield
+- Energy
+
+Damage is applied in this order:
+
+1. Shield absorbs damage.
+2. Remaining damage reduces Energy.
+
+When Energy reaches zero, the unit is considered depleted.
+
+---
+
+# Environmental Hazards
+
+Current hazards include:
+
+- Corrosion
+
+Corrosion damages shields before energy.
+
+---
+
+# Camera
+
+The gameplay camera automatically follows the active player.
+
+Players may:
+
+- Orbit with Right Mouse Button.
+- Zoom using Mouse Wheel.
+- Recenter using the R key.
+
+---
+
+# Mission Intro
+
+Gameplay begins only after the Mission Intro cinematic finishes.
+
+MissionIntro transfers control to TurnManager.
+
+---
+
+# Procedural Objects
+
+The following gameplay objects are generated at runtime:
+
+- Pyramid
+- AI Station
+- Map vertices
+- Tiles
+- Hazards
+
+These objects are not stored as prefabs.
+
+---
+
+# Future Gameplay
+
+Planned additions include:
+
+- AI opponent
+- Additional hazards
+- Card effects
+- Victory conditions
+- Save system

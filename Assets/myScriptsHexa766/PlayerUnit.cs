@@ -20,11 +20,18 @@ public class PlayerUnit : MonoBehaviour
     private TurnManager turnManager;
     private Map1HexGrid map;
     private bool isMoving = false;
+    private Vector3 shieldBarStartPos;
+    private Vector3 energyBarStartPos;
+    private float shieldBarFullWidth;
+    private float energyBarFullWidth;
 
     [SerializeField] private Animator animator;
     [SerializeField] private GameObject carriedBox; // robot internal box
     [SerializeField] private float moveSpeed = 3f;
     private bool isCarryingBox = false;
+    [Header("Health Bars")]
+    [SerializeField] private Transform shieldBar;
+    [SerializeField] private Transform energyBar;
 
     void Start()
     {
@@ -37,10 +44,12 @@ public class PlayerUnit : MonoBehaviour
             return;
         }
 
-        // 🔑 REGISTER THIS UNIT WITH THE TURN MANAGER
+        //  REGISTER THIS UNIT WITH THE TURN MANAGER
         if (turnManager != null && !turnManager.players.Contains(this))
         {
             turnManager.players.Add(this);
+            // Always keep Player1 before Player2
+            turnManager.players.Sort((a, b) => a.teamID.CompareTo(b.teamID));
             Debug.Log($"[TURN] Registered player unit: {name}");
         }
         else if (turnManager == null)
@@ -58,6 +67,20 @@ public class PlayerUnit : MonoBehaviour
             animator = GetComponentInChildren<Animator>(true);
             Debug.Log($"[{name}] Animator bound to {animator?.gameObject.name}", this);
         }
+
+        if (shieldBar != null)
+        {
+            shieldBarStartPos = shieldBar.localPosition;
+            shieldBarFullWidth = shieldBar.localScale.x;
+        }
+
+        if (energyBar != null)
+        {
+            energyBarStartPos = energyBar.localPosition;
+            energyBarFullWidth = energyBar.localScale.x;
+        }
+
+        UpdateHealthBars();
     }
 
 
@@ -324,5 +347,89 @@ public class PlayerUnit : MonoBehaviour
         Debug.Log($"[BOXDOWN] {name} dropped box");
     }
 
+    public void TakeEnvironmentalDamage(int amount)
+    {
+        if (amount <= 0)
+            return;
 
+        int originalAmount = amount;
+        int shieldLost = 0;
+        int energyLost = 0;
+
+        // Shield absorbs damage first
+        if (shield > 0)
+        {
+            shieldLost = Mathf.Min(shield, amount);
+            shield -= shieldLost;
+            amount -= shieldLost;
+        }
+
+        // Remaining damage goes to energy
+        if (amount > 0)
+        {
+            energyLost = Mathf.Min(energy, amount);
+            energy -= energyLost;
+        }
+
+        Debug.Log(
+            $"<color=#FF5500><b>☣ CORROSION</b></color> " +
+            $"<color=cyan><b>{name}</b></color>  " +
+            $"<color=yellow>-{shieldLost} Shield</color>  " +
+            $"<color=red>-{energyLost} Energy</color>  " +
+            $"→  <color=yellow>S:{shield}</color>  " +
+            $"<color=lime>E:{energy}</color>"
+        );
+
+        if (energy <= 0)
+        {
+            Debug.Log(
+                $"<color=red><b>☠ UNIT DEPLETED</b></color> " +
+                $"<color=cyan>{name}</color>"
+            );
+
+            // TODO: Game Over / Shutdown animation
+        }
+
+        UpdateHealthBars();
+    }
+
+    private void UpdateHealthBars()
+    {
+        Debug.Log($"[BARS] Unit = {name}");
+        Debug.Log($"Shield Path Parent = {shieldBar.parent.name} | Energy Path Parent = {energyBar.parent.name}");
+        Debug.Log($"[BARS] Shield={shield}  Energy={energy}");
+
+        if (shieldBar != null)
+        {
+            Debug.Log($"Shield Root = {shieldBar.root.name}");
+            Debug.Log($"Shield Scale BEFORE = {shieldBar.localScale}");
+            float shieldPercent = Mathf.Clamp01(shield / 100f);
+
+            Vector3 scale = shieldBar.localScale;
+            scale.x = shieldBarFullWidth * shieldPercent;
+            shieldBar.localScale = scale;
+            Debug.Log($"Shield Scale AFTER = {shieldBar.localScale}");
+
+            Vector3 pos = shieldBarStartPos;
+            pos.x = shieldBarStartPos.x - (shieldBarFullWidth - scale.x) * 0.5f;
+            shieldBar.localPosition = pos;
+        }
+
+        if (energyBar != null)
+        {
+            Debug.Log($"Energy Root = {energyBar.root.name}");
+            Debug.Log($"Energy Scale BEFORE = {energyBar.localScale}");
+            float energyPercent = Mathf.Clamp01(energy / 100f);
+
+            Vector3 scale = energyBar.localScale;
+            Debug.Log($"Energy Scale AFTER = {energyBar.localScale}");
+            scale.x = energyBarFullWidth * energyPercent;
+            energyBar.localScale = scale;
+            
+
+            Vector3 pos = energyBarStartPos;
+            pos.x = energyBarStartPos.x - (energyBarFullWidth - scale.x) * 0.5f;
+            energyBar.localPosition = pos;
+        }
+    }
 }

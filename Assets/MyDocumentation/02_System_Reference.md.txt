@@ -1,0 +1,284 @@
+# HEXA_766 System Reference
+
+**Version:** 0.1  
+**Author:** Eric Ávila  
+**Project:** HEXA_766
+
+---
+
+# Purpose
+
+This document describes every major gameplay system implemented in **HEXA_766**.
+
+Its purpose is to explain:
+
+- what each system is responsible for;
+- how it interacts with other systems;
+- where future modifications should be made.
+
+This document complements the source code and should always be updated whenever a core system changes significantly.
+
+---
+
+# Core Systems
+
+---
+
+# TurnManager
+
+## Purpose
+
+The **TurnManager** is the central gameplay controller.
+
+It manages:
+
+- match flow;
+- turn order;
+- movement permissions;
+- player selection;
+- environmental effects;
+- communication between gameplay systems.
+
+---
+
+## Responsibilities
+
+- Start the match after `MissionIntro`
+- Alternate turns between Player1 and Player2
+- Maintain the current player
+- Reset movement points
+- Highlight valid destinations
+- Validate movement
+- Apply environmental hazards
+- Notify `CameraFollow` when the active player changes
+
+---
+
+## Dependencies
+
+- `PlayerUnit`
+- `Map1HexGrid`
+- `ClickableSphere`
+- `CameraFollow`
+
+---
+
+## Important Methods
+
+```csharp
+BeginMatch()
+
+StartNextTurn()
+
+HandleMoveFinished()
+
+HighlightValidMoves()
+
+OnSphereClicked()
+```
+
+---
+
+# PlayerUnit
+
+## Purpose
+
+Represents one playable robot.
+
+Each player robot is an instance of this class.
+
+---
+
+## Responsibilities
+
+- Health
+- Shield
+- Movement
+- Animation
+- Environmental damage
+- Carrying boxes
+- Health bar updates
+
+---
+
+## Components
+
+- Animator
+- HealthCanvas
+- ShieldBar
+- EnergyBar
+
+---
+
+## Important Methods
+
+```csharp
+SmoothMove()
+
+TakeEnvironmentalDamage()
+
+UpdateHealthBars()
+
+SetMovementPoints()
+
+ConsumeMovementPoint()
+```
+
+---
+
+# CameraFollow
+
+## Purpose
+
+Controls the gameplay camera after the cinematic introduction.
+
+---
+
+## Features
+
+- Smooth follow
+- Mouse-wheel zoom
+- Right Mouse orbit
+- Automatic target switching
+- Recenter (`R`)
+
+---
+
+## Input
+
+| Input | Action |
+|--------|--------|
+| Mouse Wheel | Zoom |
+| Right Mouse | Orbit |
+| R | Recenter |
+
+---
+
+# MissionIntro
+
+## Purpose
+
+Runs the introductory cinematic before gameplay begins.
+
+---
+
+## Camera Sequence
+
+1. CAM_Overview
+2. CAM_Pyramid
+3. CAM_AIStation
+4. CAM_Player1
+5. CAM_Player2
+6. MAP_CENTER
+
+---
+
+## Dependencies
+
+- MissionDirector
+- TurnManager
+- CameraFollow
+
+---
+
+# Map1HexGrid
+
+## Purpose
+
+Procedurally generates the playable board.
+
+---
+
+## Responsibilities
+
+- Board generation
+- Vertex graph generation
+- Coordinate conversion
+- Reachable vertices
+- Pathfinding support
+- Hazard spawning
+- AI Station spawning
+- Pyramid spawning
+
+---
+
+# ClickableSphere
+
+## Purpose
+
+Represents one legal movement destination.
+
+---
+
+## Responsibilities
+
+- Receive mouse click
+- Notify TurnManager
+- Destroy itself when movement finishes
+
+---
+
+# HealthCanvas
+
+## Purpose
+
+Displays the current health status of a `PlayerUnit`.
+
+---
+
+## Contains
+
+- Background
+- ShieldBar
+- EnergyBar
+
+---
+
+## Known Pitfalls
+
+⚠ **ShieldBar** and **EnergyBar** must reference the visible child transforms.
+
+Some objects share identical names, but only one is the actual visible bar.
+
+Assigning the wrong transform causes the health bars to stop updating even though the gameplay values change correctly.
+
+---
+
+# Architecture Diagram
+
+```text
+MissionDirector
+        │
+        ▼
+MissionIntro
+        │
+        ▼
+TurnManager
+        │
+        ├──────────────┐
+        ▼              ▼
+PlayerUnit        CameraFollow
+        │
+        ▼
+HealthCanvas
+
+TurnManager
+        │
+        ▼
+Map1HexGrid
+        │
+        ▼
+ClickableSphere
+```
+
+---
+
+# Documentation Rule
+
+Whenever a system receives:
+
+- a new responsibility;
+- a new dependency;
+- a major refactor;
+
+this document must be updated during the same work session.
